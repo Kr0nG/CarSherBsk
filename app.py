@@ -29,7 +29,6 @@ def get_db_connection():
             port=5432,
             connect_timeout=10
         )
-        print("✅ Подключение к PostgreSQL успешно")
         return conn
     except Exception as e:
         print(f"❌ Ошибка подключения к PostgreSQL: {e}")
@@ -182,10 +181,6 @@ def init_database():
 print("=" * 60)
 print("🚀 ЗАПУСК CARSHAREBSK С POSTGRESQL")
 print("=" * 60)
-print(f"📡 Хост: dpg-d4vguk1r0fns739lmkfg-a.virginia-postgres.render.com")
-print(f"🗄️  База: postgres18")
-print(f"👤 Пользователь: postgres18_user")
-print("=" * 60)
 
 if init_database():
     print("✅ База данных готова к работе")
@@ -236,7 +231,7 @@ def load_user(user_id):
     return None
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
-def execute_query(query, params=None, fetch=True):
+def execute_query(query, params=None, fetch=True, commit=True):
     """Выполняет SQL запрос"""
     conn = get_db_connection()
     if not conn:
@@ -250,22 +245,22 @@ def execute_query(query, params=None, fetch=True):
         if fetch and query.strip().upper().startswith('SELECT'):
             result = cur.fetchall()
         else:
-            conn.commit()
+            if commit:
+                conn.commit()
             result = cur.rowcount
         
         cur.close()
-        conn.close()
+        if conn:
+            conn.close()
         return result
     except Exception as e:
         print(f"❌ Ошибка запроса: {e}")
         print(f"   Запрос: {query[:100]}...")
         if params:
             print(f"   Параметры: {params}")
-        conn.rollback()
-        return None if fetch else 0
-    finally:
         if conn:
-            conn.close()
+            conn.rollback()
+        return None if fetch else 0
 
 # ========== ОСНОВНЫЕ МАРШРУТЫ ==========
 @app.route('/')
@@ -343,116 +338,6 @@ def cars():
         return render_template('cars.html', cars=[], car_classes=[], transmissions=[],
                              fuel_types=[], test_cars_count=0)
 
-@app.route('/car/<int:car_id>')
-@login_required
-def car_detail(car_id):
-    try:
-        car = execute_query('SELECT * FROM cars WHERE id = %s', (car_id,))
-        if not car:
-            flash('Автомобиль не найден', 'danger')
-            return redirect(url_for('cars'))
-        
-        car = car[0]
-        
-        # Похожие автомобили
-        similar_cars = execute_query('''
-            SELECT * FROM cars 
-            WHERE car_class = %s AND id != %s AND is_available = TRUE 
-            LIMIT 3
-        ''', (car['car_class'], car_id)) or []
-        
-        return render_template('booking.html', car=car, similar_cars=similar_cars)
-    except Exception as e:
-        print(f"❌ Ошибка в деталях автомобиля: {e}")
-        flash('Ошибка при загрузке данных автомобиля', 'danger')
-        return redirect(url_for('cars'))
-
-@app.route('/book', methods=['POST'])
-@login_required
-def book_car():
-    try:
-        car_id = int(request.form['car_id'])
-        start_date = request.form['start_date']
-        end_date = request.form['end_date']
-        
-        # Получаем автомобиль
-        car = execute_query('SELECT * FROM cars WHERE id = %s', (car_id,))
-        if not car:
-            return jsonify({'success': False, 'message': 'Автомобиль не найден'})
-        
-        car = car[0]
-        
-        # Проверяем доступность
-        conflicting = execute_query('''
-            SELECT id FROM bookings 
-            WHERE car_id = %s AND status = 'active' 
-            AND (start_date <= %s AND end_date >= %s) 
-            OR (start_date <= %s AND end_date >= %s)
-        ''', (car_id, end_date, start_date, start_date, end_date))
-        
-        if conflicting:
-            return jsonify({'success': False, 'message': 'Автомобиль уже забронирован на эти даты'})
-        
-        # Расчет стоимости
-        start = datetime.strptime(start_date, '%Y-%m-%d')
-        end = datetime.strptime(end_date, '%Y-%m-%d')
-        days = (end - start).days
-        total_price = float(car['daily_price']) * days
-        
-        # Создаем бронирование
-        result = execute_query('''
-            INSERT INTO bookings (user_id, car_id, start_date, end_date, total_price)
-            VALUES (%s, %s, %s, %s, %s) RETURNING id
-        ''', (current_user.id, car_id, start_date, end_date, total_price), fetch=True)
-        
-        if result:
-            return jsonify({
-                'success': True,
-                'message': f'Бронирование успешно создано! Стоимость: {total_price} ₽ за {days} дней.'
-            })
-        else:
-            return jsonify({'success': False, 'message': 'Ошибка при создании бронирования'})
-            
-    except Exception as e:
-        print(f"❌ Ошибка бронирования: {e}")
-        return jsonify({'success': False, 'message': f'Произошла ошибка: {str(e)}'})
-
-@app.route('/profile')
-@login_required
-def profile():
-    try:
-        bookings = execute_query('''
-            SELECT b.*, c.brand, c.model, c.image_url
-            FROM bookings b
-            JOIN cars c ON b.car_id = c.id
-            WHERE b.user_id = %s
-            ORDER BY b.created_at DESC
-        ''', (current_user.id,)) or []
-        
-        return render_template('profile.html', bookings=bookings)
-    except Exception as e:
-        print(f"❌ Ошибка в профиле: {e}")
-        return render_template('profile.html', bookings=[])
-
-@app.route('/cancel_booking/<int:booking_id>', methods=['POST'])
-@login_required
-def cancel_booking(booking_id):
-    try:
-        result = execute_query('''
-            UPDATE bookings SET status = 'cancelled'
-            WHERE id = %s AND user_id = %s AND status = 'active'
-        ''', (booking_id, current_user.id), fetch=False)
-        
-        if result and result > 0:
-            flash('Бронирование успешно отменено', 'success')
-        else:
-            flash('Бронирование не найдено или уже отменено', 'danger')
-            
-    except Exception as e:
-        flash(f'Ошибка при отмене бронирования: {str(e)}', 'danger')
-    
-    return redirect(url_for('profile'))
-
 # ========== АУТЕНТИФИКАЦИЯ ==========
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -465,6 +350,8 @@ def register():
         password = request.form['password']
         phone = request.form.get('phone', '')
         driver_license = request.form.get('driver_license', '')
+        
+        print(f"📝 Регистрация пользователя: {username}, {email}")
         
         # Проверяем существующего пользователя
         existing = execute_query(
@@ -489,12 +376,15 @@ def register():
             )
             
             if result:
+                print(f"✅ Пользователь {username} зарегистрирован, ID: {result}")
                 flash('Регистрация прошла успешно! Теперь вы можете войти в систему.', 'success')
                 return redirect(url_for('login'))
             else:
+                print(f"❌ Ошибка при регистрации пользователя {username}")
                 flash('Ошибка при регистрации', 'danger')
                 
         except Exception as e:
+            print(f"❌ Исключение при регистрации: {e}")
             flash(f'Ошибка при регистрации: {str(e)}', 'danger')
     
     return render_template('register.html')
@@ -508,14 +398,20 @@ def login():
         username = request.form['username']
         password = request.form['password']
         
+        print(f"🔑 Попытка входа: {username}")
+        
         try:
             user_data = execute_query(
                 'SELECT * FROM users WHERE username = %s',
                 (username,)
             )
             
+            print(f"🔍 Результат поиска пользователя: {user_data}")
+            
             if user_data and len(user_data) > 0:
                 user_data = user_data[0]
+                print(f"👤 Найден пользователь: {user_data['username']}")
+                
                 if check_password_hash(user_data['password_hash'], password):
                     user = User(
                         user_data['id'],
@@ -528,16 +424,23 @@ def login():
                     )
                     login_user(user)
                     
+                    print(f"✅ Успешный вход: {user.username}, Админ: {user.is_admin}")
+                    
                     if user.is_admin:
                         flash('Вы успешно вошли в систему как администратор!', 'success')
                     else:
                         flash(f'Вы успешно вошли в систему! Добро пожаловать, {user.username}!', 'success')
                     
                     return redirect(url_for('index'))
+                else:
+                    print("❌ Неверный пароль")
+            else:
+                print("❌ Пользователь не найден")
             
             flash('Неверное имя пользователя или пароль', 'danger')
             
         except Exception as e:
+            print(f"❌ Ошибка при входе: {e}")
             flash(f'Ошибка при входе: {str(e)}', 'danger')
     
     return render_template('login.html')
@@ -549,15 +452,6 @@ def logout():
     flash('Вы успешно вышли из системы. Ждем вас снова!', 'info')
     return redirect(url_for('index'))
 
-# ========== ДОПОЛНИТЕЛЬНЫЕ СТРАНИЦЫ ==========
-@app.route('/contacts')
-def contacts():
-    return render_template('contacts.html')
-
-@app.route('/about')
-def about():
-    return render_template('about.html')
-
 # ========== АДМИН ПАНЕЛЬ ==========
 @app.route('/admin')
 @login_required
@@ -567,12 +461,17 @@ def admin():
         return redirect(url_for('index'))
     
     try:
+        print(f"👮 Админ панель запрошена пользователем: {current_user.username}")
+        
         stats_cars = execute_query('SELECT COUNT(*) as count FROM cars')
         stats_users = execute_query('SELECT COUNT(*) as count FROM users')
         stats_bookings = execute_query("SELECT COUNT(*) as count FROM bookings WHERE status = 'active'")
         stats_revenue = execute_query("SELECT COALESCE(SUM(total_price), 0) as total FROM bookings WHERE status = 'active'")
         
         all_cars = execute_query('SELECT * FROM cars ORDER BY id') or []
+        
+        print(f"📊 Статистика: {stats_cars[0]['count'] if stats_cars else 0} машин, "
+              f"{stats_users[0]['count'] if stats_users else 0} пользователей")
         
         return render_template('admin.html',
                              total_cars=stats_cars[0]['count'] if stats_cars else 0,
@@ -594,11 +493,21 @@ def admin_users():
         return redirect(url_for('index'))
     
     try:
+        print(f"👥 Запрос списка пользователей от: {current_user.username}")
+        
         users = execute_query('SELECT * FROM users ORDER BY created_at DESC') or []
+        
+        print(f"🔍 Найдено пользователей: {len(users)}")
+        
+        for user in users:
+            print(f"   👤 {user['id']}: {user['username']} (admin: {user['is_admin']})")
         
         # Статистика
         admin_count = execute_query("SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE")
         user_count = execute_query("SELECT COUNT(*) as count FROM users WHERE is_admin = FALSE")
+        
+        print(f"📊 Админов: {admin_count[0]['count'] if admin_count else 0}, "
+              f"Пользователей: {user_count[0]['count'] if user_count else 0}")
         
         # Все бронирования
         all_bookings = execute_query('''
@@ -609,6 +518,8 @@ def admin_users():
             ORDER BY b.created_at DESC
         ''') or []
         
+        print(f"📋 Найдено бронирований: {len(all_bookings)}")
+        
         return render_template('admin_users.html',
                              users=users,
                              admin_count=admin_count[0]['count'] if admin_count else 0,
@@ -616,143 +527,60 @@ def admin_users():
                              bookings_db=all_bookings)
     except Exception as e:
         print(f"❌ Ошибка страницы пользователей: {e}")
+        import traceback
+        traceback.print_exc()
         return render_template('admin_users.html',
                              users=[], admin_count=0, user_count=0, bookings_db=[])
 
-# ========== API ДЛЯ АДМИНА ==========
-@app.route('/admin/get_car/<int:car_id>')
-@login_required
-def get_car_data(car_id):
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Доступ запрещен'})
-    
-    car = execute_query('SELECT * FROM cars WHERE id = %s', (car_id,))
-    if car:
-        return jsonify({'success': True, 'car': car[0]})
-    return jsonify({'success': False, 'message': 'Автомобиль не найден'})
+# ========== ДОПОЛНИТЕЛЬНЫЕ СТРАНИЦЫ ==========
+@app.route('/contacts')
+def contacts():
+    return render_template('contacts.html')
 
-@app.route('/admin/update_car/<int:car_id>', methods=['POST'])
-@login_required
-def update_car(car_id):
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Доступ запрещен'})
-    
-    try:
-        data = request.form
-        features_str = data.get('features', '')
-        features = [f.strip() for f in features_str.split(',') if f.strip()] if features_str else []
-        
-        result = execute_query('''
-            UPDATE cars SET
-                brand = %s, model = %s, year = %s, daily_price = %s,
-                car_class = %s, fuel_type = %s, transmission = %s,
-                color = %s, seats = %s, location = %s, description = %s,
-                image_url = %s, engine = %s, consumption = %s, features = %s
-            WHERE id = %s
-        ''', (
-            data.get('brand'), data.get('model'), data.get('year'), data.get('daily_price'),
-            data.get('car_class'), data.get('fuel_type'), data.get('transmission'),
-            data.get('color'), data.get('seats'), data.get('location'), data.get('description'),
-            data.get('image_url'), data.get('engine'), data.get('consumption'), features, car_id
-        ), fetch=False)
-        
-        if result:
-            return jsonify({'success': True, 'message': 'Автомобиль обновлен'})
-        return jsonify({'success': False, 'message': 'Ошибка обновления'})
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+@app.route('/about')
+def about():
+    return render_template('about.html')
 
-@app.route('/admin/add_car', methods=['POST'])
+@app.route('/car/<int:car_id>')
 @login_required
-def add_car():
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Доступ запрещен'})
-    
+def car_detail(car_id):
     try:
-        data = request.form
-        
-        if not data.get('brand') or not data.get('model'):
-            return jsonify({'success': False, 'message': 'Заполните марку и модель'})
-        
-        if not data.get('image_url'):
-            return jsonify({'success': False, 'message': 'Укажите ссылку на изображение'})
-        
-        features_str = data.get('features', '')
-        features = [f.strip() for f in features_str.split(',') if f.strip()] if features_str else []
-        
-        result = execute_query('''
-            INSERT INTO cars (
-                brand, model, year, daily_price, car_class, fuel_type, transmission,
-                color, seats, location, description, image_url, engine, consumption, features
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            data.get('brand'), data.get('model'), data.get('year'), data.get('daily_price'),
-            data.get('car_class'), data.get('fuel_type'), data.get('transmission'),
-            data.get('color'), data.get('seats'), data.get('location'), data.get('description'),
-            data.get('image_url'), data.get('engine'), data.get('consumption'), features
-        ), fetch=True)
-        
-        if result:
-            return jsonify({'success': True, 'message': 'Автомобиль добавлен'})
-        return jsonify({'success': False, 'message': 'Ошибка добавления'})
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/admin/delete_car/<int:car_id>', methods=['POST'])
-@login_required
-def delete_car(car_id):
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Доступ запрещен'})
-    
-    try:
-        active_bookings = execute_query(
-            "SELECT COUNT(*) as count FROM bookings WHERE car_id = %s AND status = 'active'",
-            (car_id,)
-        )
-        
-        if active_bookings and active_bookings[0]['count'] > 0:
-            return jsonify({
-                'success': False,
-                'message': f'Нельзя удалить автомобиль с активными бронированиями ({active_bookings[0]["count"]})'
-            })
-        
-        result = execute_query('DELETE FROM cars WHERE id = %s', (car_id,), fetch=False)
-        
-        if result:
-            return jsonify({'success': True, 'message': 'Автомобиль удален'})
-        return jsonify({'success': False, 'message': 'Ошибка удаления'})
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
-@app.route('/admin/toggle_car/<int:car_id>', methods=['POST'])
-@login_required
-def toggle_car(car_id):
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Доступ запрещен'})
-    
-    try:
-        car = execute_query('SELECT is_available FROM cars WHERE id = %s', (car_id,))
+        car = execute_query('SELECT * FROM cars WHERE id = %s', (car_id,))
         if not car:
-            return jsonify({'success': False, 'message': 'Автомобиль не найден'})
+            flash('Автомобиль не найден', 'danger')
+            return redirect(url_for('cars'))
         
-        new_status = not car[0]['is_available']
+        car = car[0]
         
-        result = execute_query(
-            'UPDATE cars SET is_available = %s WHERE id = %s',
-            (new_status, car_id),
-            fetch=False
-        )
+        # Похожие автомобили
+        similar_cars = execute_query('''
+            SELECT * FROM cars 
+            WHERE car_class = %s AND id != %s AND is_available = TRUE 
+            LIMIT 3
+        ''', (car['car_class'], car_id)) or []
         
-        if result:
-            status_text = "доступен" if new_status else "недоступен"
-            return jsonify({'success': True, 'message': f'Автомобиль теперь {status_text}'})
-        return jsonify({'success': False, 'message': 'Ошибка обновления'})
-            
+        return render_template('booking.html', car=car, similar_cars=similar_cars)
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        print(f"❌ Ошибка в деталях автомобиля: {e}")
+        flash('Ошибка при загрузке данных автомобиля', 'danger')
+        return redirect(url_for('cars'))
+
+@app.route('/profile')
+@login_required
+def profile():
+    try:
+        bookings = execute_query('''
+            SELECT b.*, c.brand, c.model, c.image_url
+            FROM bookings b
+            JOIN cars c ON b.car_id = c.id
+            WHERE b.user_id = %s
+            ORDER BY b.created_at DESC
+        ''', (current_user.id,)) or []
+        
+        return render_template('profile.html', bookings=bookings)
+    except Exception as e:
+        print(f"❌ Ошибка в профиле: {e}")
+        return render_template('profile.html', bookings=[])
 
 # ========== ОБРАБОТЧИК ОШИБОК ==========
 @app.errorhandler(404)
