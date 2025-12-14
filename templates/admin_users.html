@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Управление пользователями</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>{{ users|length }}</h3>
+                    <p>Всего пользователей</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>{{ admin_count }}</h3>
+                    <p>Администраторов</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>{{ user_count }}</h3>
+                    <p>Обычных пользователей</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h3>{{ bookings_db|length }}</h3>
+                    <p>Всего бронирований</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Зарегистрированные пользователи</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Имя пользователя</th>
+                            <th>Email</th>
+                            <th>Телефон</th>
+                            <th>Водительское удостоверение</th>
+                            <th>Роль</th>
+                            <th>Бронирования</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users %}
+                        {% set user_stats = user_stats.get(user.id, {'total': 0, 'active': 0}) %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td>{{ user.username }}</td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.phone or 'Не указан' }}</td>
+                            <td>{{ user.driver_license or 'Не указано' }}</td>
+                            <td>
+                                {% if user.is_admin %}
+                                <span class="badge bg-danger">Админ</span>
+                                {% else %}
+                                <span class="badge bg-success">Пользователь</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if user_stats.total > 0 %}
+                                <button class="btn btn-sm btn-info" onclick="viewUserBookings({{ user.id }}, '{{ user.username }}', {{ user_stats.active }})">
+                                    Показать ({{ user_stats.total }})
+                                    {% if user_stats.active > 0 %}
+                                    <span class="badge bg-danger ms-1">{{ user_stats.active }} актив.</span>
+                                    {% endif %}
+                                </button>
+                                {% else %}
+                                <span class="text-muted">Нет броней</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not user.is_admin and user.id != current_user.id %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}', {{ user_stats.active }})"
+                                        title="{% if user_stats.active > 0 %}Есть активные бронирования{% endif %}">
+                                    <i class="fas fa-trash me-1"></i> Удалить
+                                </button>
+                                {% elif user.is_admin %}
+                                <span class="text-muted small">Только для суперадмина</span>
+                                {% else %}
+                                <span class="text-muted small">Это вы</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра бронирований пользователя -->
+<div class="modal fade" id="userBookingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userBookingsTitle">Бронирования пользователя</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="userBookingsContent">
+                    <!-- Контент загружается динамически -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для подтверждения удаления пользователя -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение удаления</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteUserText">Вы уверены, что хотите удалить этого пользователя?</p>
+                <p class="text-danger"><small><strong>Внимание:</strong> Это действие удалит пользователя и все его бронирования. Отменить это действие будет невозможно.</small></p>
+                <div id="activeBookingsWarning" class="alert alert-warning d-none">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <span id="activeBookingsCount">0</span> активных бронирований будут автоматически отменены.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDeleteUser()">
+                    <i class="fas fa-trash me-1"></i> Удалить
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для подтверждения отмены бронирования -->
+<div class="modal fade" id="cancelBookingModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Отмена бронирования</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="cancelBookingText">Вы уверены, что хотите отменить это бронирование?</p>
+                <p class="text-warning"><small><strong>Внимание:</strong> Отменить бронирование смогут только администратор или владелец бронирования.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-danger" onclick="confirmCancelBooking()">
+                    <i class="fas fa-times me-1"></i> Отменить бронирование
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let userToDelete = null;
+let bookingToCancel = null;
+
+function viewUserBookings(userId, userName, activeCount) {
+    const allBookings = [
+        {% for booking in bookings_db %}
+        {
+            id: {{ booking.id }},
+            user_id: {{ booking.user_id }},
+            car_id: {{ booking.car_id }},
+            car_brand: "{{ booking.brand|safe }}",
+            car_model: "{{ booking.model|safe }}",
+            start_date: "{{ booking.start_date }}",
+            end_date: "{{ booking.end_date }}",
+            total_price: {{ booking.total_price }},
+            status: "{{ booking.status }}",
+            created_at: "{{ booking.created_at }}",
+            image_url: "{{ booking.image_url or '' }}"
+        },
+        {% endfor %}
+    ];
+
+    // Фильтруем бронирования по user_id
+    const userBookings = allBookings.filter(booking => booking.user_id == userId);
+
+    if (userBookings.length === 0) {
+        document.getElementById('userBookingsTitle').textContent = `Бронирования пользователя ${userName}`;
+        document.getElementById('userBookingsContent').innerHTML = '<p class="text-center text-muted">У пользователя нет бронирований</p>';
+    } else {
+        const activeBookings = userBookings.filter(booking => booking.status === 'active');
+        const cancelledBookings = userBookings.filter(booking => booking.status === 'cancelled');
+
+        let html = `
+            <div class="mb-3">
+                <h6>Пользователь: ${userName}</h6>
+                <p class="text-muted">
+                    Всего бронирований: ${userBookings.length} |
+                    <span class="text-success">Активных: ${activeBookings.length}</span> |
+                    <span class="text-secondary">Отмененных: ${cancelledBookings.length}</span>
+                </p>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Автомобиль</th>
+                            <th>Период</th>
+                            <th>Стоимость</th>
+                            <th>Статус</th>
+                            <th>Дата создания</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        userBookings.forEach(booking => {
+            const carName = `${booking.car_brand} ${booking.car_model}`;
+            const startDate = new Date(booking.start_date);
+            const endDate = new Date(booking.end_date);
+            const days = Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
+
+            let statusBadge = '';
+            if (booking.status === 'active') {
+                statusBadge = '<span class="badge bg-success">Активно</span>';
+            } else if (booking.status === 'cancelled') {
+                statusBadge = '<span class="badge bg-secondary">Отменено</span>';
+            } else {
+                statusBadge = `<span class="badge bg-warning">${booking.status}</span>`;
+            }
+
+            html += `
+                <tr>
+                    <td><small class="text-muted">#${booking.id}</small></td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            ${booking.image_url ? `<img src="${booking.image_url}" alt="${carName}" class="rounded me-2" style="width: 50px; height: 35px; object-fit: cover;">` : ''}
+                            <div>
+                                <strong>${carName}</strong><br>
+                                <small class="text-muted">ID авто: ${booking.car_id}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <strong>${booking.start_date}</strong><br>
+                        по <strong>${booking.end_date}</strong><br>
+                        <small class="text-muted">${days} дней</small>
+                    </td>
+                    <td>
+                        <strong>${booking.total_price} ₽</strong><br>
+                        <small class="text-muted">${days > 0 ? (booking.total_price / days).toFixed(2) : booking.total_price} ₽/день</small>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>${booking.created_at}</td>
+                    <td>
+                        ${booking.status === 'active' ?
+                            `<button class="btn btn-sm btn-danger" onclick="cancelBooking(${booking.id}, '${carName.replace(/'/g, "\\'")}', '${booking.start_date} - ${booking.end_date}')">
+                                <i class="fas fa-times"></i> Отменить
+                            </button>` :
+                            '<span class="text-muted">-</span>'
+                        }
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        document.getElementById('userBookingsTitle').textContent = `Бронирования пользователя ${userName}`;
+        document.getElementById('userBookingsContent').innerHTML = html;
+    }
+
+    const bookingsModal = new bootstrap.Modal(document.getElementById('userBookingsModal'));
+    bookingsModal.show();
+}
+
+function deleteUser(userId, userName, activeCount) {
+    userToDelete = userId;
+
+    let message = `Вы уверены, что хотите удалить пользователя "${userName}" (ID: ${userId})?`;
+    document.getElementById('deleteUserText').textContent = message;
+
+    const warningDiv = document.getElementById('activeBookingsWarning');
+    const countSpan = document.getElementById('activeBookingsCount');
+
+    if (activeCount > 0) {
+        countSpan.textContent = activeCount;
+        warningDiv.classList.remove('d-none');
+    } else {
+        warningDiv.classList.add('d-none');
+    }
+
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+    deleteModal.show();
+}
+
+function confirmDeleteUser() {
+    if (!userToDelete) return;
+
+    const deleteBtn = document.querySelector('#deleteUserModal .btn-danger');
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Удаление...';
+    deleteBtn.disabled = true;
+
+    fetch('/admin/delete_user/' + userToDelete, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
+        deleteModal.hide();
+
+        if (data.success) {
+            alert(data.message);
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Ошибка: ' + data.message);
+            deleteBtn.innerHTML = originalText;
+            deleteBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        alert('Ошибка сети при удалении пользователя');
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+    });
+}
+
+function cancelBooking(bookingId, carName, period) {
+    bookingToCancel = bookingId;
+
+    document.getElementById('cancelBookingText').textContent =
+        `Вы уверены, что хотите отменить бронирование #${bookingId}?\n\n` +
+        `Автомобиль: ${carName}\n` +
+        `Период: ${period}`;
+
+    const cancelModal = new bootstrap.Modal(document.getElementById('cancelBookingModal'));
+    cancelModal.show();
+}
+
+function confirmCancelBooking() {
+    if (!bookingToCancel) return;
+
+    const cancelBtn = document.querySelector('#cancelBookingModal .btn-danger');
+    const originalText = cancelBtn.innerHTML;
+    cancelBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Отмена...';
+    cancelBtn.disabled = true;
+
+    fetch('/admin/cancel_booking/' + bookingToCancel, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        const cancelModal = bootstrap.Modal.getInstance(document.getElementById('cancelBookingModal'));
+        cancelModal.hide();
+
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Ошибка: ' + data.message);
+            cancelBtn.innerHTML = originalText;
+            cancelBtn.disabled = false;
+        }
+    })
+    .catch(error => {
+        alert('Ошибка сети при отмене бронирования');
+        cancelBtn.innerHTML = originalText;
+        cancelBtn.disabled = false;
+    });
+}
+</script>
+
+<style>
+.modal-xl {
+    max-width: 1200px;
+}
+.table td {
+    vertical-align: middle;
+}
+.badge {
+    font-size: 0.8em;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CarShareBsk - Каршеринг в Бийске{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #2c5aa0;
+            --secondary-color: #f8f9fa;
+            --accent-color: #ff6b35;
+            --text-dark: #333;
+            --text-light: #6c757d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-dark);
+            line-height: 1.6;
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color), #1e3d6f);
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.6rem;
+            color: white !important;
+        }
+
+        .nav-link {
+            font-weight: 500;
+            transition: all 0.3s ease;
+            color: rgba(255,255,255,0.9) !important;
+            padding: 0.5rem 1rem !important;
+            border-radius: 5px;
+            margin: 0 0.2rem;
+        }
+
+        .nav-link:hover {
+            color: white !important;
+            background: rgba(255,255,255,0.1);
+            transform: translateY(-1px);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), #1e3d6f);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(44, 90, 160, 0.3);
+            background: linear-gradient(135deg, #1e3d6f, var(--primary-color));
+        }
+
+        .btn-outline-primary {
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            font-weight: 600;
+            padding: 10px 25px;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(44, 90, 160, 0.2);
+        }
+
+        /* Стили для кнопки "Начать аренду" */
+        .btn-light {
+            background: linear-gradient(135deg, #ffffff, #f8f9fa);
+            color: var(--primary-color);
+            border: 2px solid transparent;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-light:hover {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            color: var(--primary-color);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 30px rgba(255, 255, 255, 0.4);
+        }
+
+        .btn-light:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+        }
+
+        .card {
+            border: none;
+            box-shadow: 0 3px 20px rgba(0,0,0,0.08);
+            transition: all 0.4s ease;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 35px rgba(0,0,0,0.15);
+        }
+
+        .car-card {
+            border: 1px solid #e9ecef;
+        }
+
+        .car-card .card-img-top {
+            height: 220px;
+            object-fit: cover;
+            transition: transform 0.4s ease;
+        }
+
+        .car-card:hover .card-img-top {
+            transform: scale(1.08);
+        }
+
+        .badge-car-class {
+            font-size: 0.75em;
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 1;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-weight: 600;
+        }
+
+        .fuel-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 1;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-weight: 600;
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, var(--primary-color), #1e3d6f);
+            color: white;
+            padding: 100px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 100" fill="%23ffffff" opacity="0.1"><polygon points="1000,0 1000,100 0,100"/></svg>');
+            background-size: cover;
+        }
+
+        .section-title {
+            position: relative;
+            margin-bottom: 3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            font-size: 2.2rem;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80px;
+            height: 4px;
+            background: var(--accent-color);
+            border-radius: 2px;
+        }
+
+        .section-title.text-center::after {
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .section-title.text-start::after {
+            left: 0;
+            transform: none;
+        }
+
+        .feature-icon {
+            width: 90px;
+            height: 90px;
+            background: linear-gradient(135deg, var(--primary-color), #1e3d6f);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 2rem;
+            color: white;
+            font-size: 2.2rem;
+            box-shadow: 0 5px 15px rgba(44, 90, 160, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .feature-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .step-number {
+            width: 70px;
+            height: 70px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin: 0 auto 1.5rem;
+            box-shadow: 0 5px 15px rgba(44, 90, 160, 0.3);
+            transition: transform 0.3s ease;
+        }
+
+        .step-number:hover {
+            transform: scale(1.1);
+        }
+
+        footer {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 3rem 0 1rem;
+        }
+
+        .footer-links a {
+            color: #bdc3c7;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            line-height: 2;
+        }
+
+        .footer-links a:hover {
+            color: white;
+            text-decoration: underline;
+        }
+
+        .price-tag {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        .car-features .badge {
+            background-color: #e9ecef;
+            color: var(--text-dark);
+            font-weight: 500;
+            margin: 3px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        .alert {
+            border: none;
+            border-radius: 10px;
+            font-weight: 500;
+            padding: 1rem 1.5rem;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        }
+
+        .rating {
+            color: #ffc107;
+            font-size: 1.1rem;
+        }
+
+        .lead {
+            font-size: 1.2rem;
+            font-weight: 400;
+            line-height: 1.7;
+        }
+
+        .display-4 {
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .stat-number {
+            font-size: 3.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: block;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: 1.1rem;
+            color: var(--text-light);
+            font-weight: 500;
+        }
+
+        /* Анимации */
+        .fade-in {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.6s ease;
+        }
+
+        .fade-in.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .stagger-item {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.5s ease;
+        }
+
+        /* Убедимся, что все ссылки работают */
+        a {
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .hero-section {
+                padding: 60px 0;
+                text-align: center;
+            }
+
+            .display-4 {
+                font-size: 2.5rem;
+            }
+
+            .section-title {
+                font-size: 1.8rem;
+            }
+
+            .stat-number {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигация -->
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <i class="fas fa-car me-2"></i>CarShareBsk
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">
+                            <i class="fas fa-home me-1"></i>Главная
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('cars') }}">
+                            <i class="fas fa-car-side me-1"></i>Автомобили
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('about') }}">
+                            <i class="fas fa-info-circle me-1"></i>О нас
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('contacts') }}">
+                            <i class="fas fa-address-book me-1"></i>Контакты
+                        </a>
+                    </li>
+
+                    {% if current_user.is_authenticated and current_user.is_admin %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin') }}">
+                            <i class="fas fa-cog me-1"></i>Админ панель
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('admin_users') }}">
+                            <i class="fas fa-users me-1"></i>Пользователи
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user me-1"></i>{{ current_user.username }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('profile') }}">
+                                <i class="fas fa-user-circle me-2"></i>Личный кабинет
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt me-2"></i>Выйти
+                            </a></li>
+                        </ul>
+                    </li>
+                    {% else %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">
+                            <i class="fas fa-sign-in-alt me-1"></i>Войти
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}">
+                            <i class="fas fa-user-plus me-1"></i>Регистрация
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Сообщения -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show mb-0 rounded-0" role="alert">
+                    <div class="container">
+                        <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-circle{% elif category == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %} me-2"></i>
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <!-- Основной контент -->
+    {% block content %}{% endblock %}
+
+    <!-- Футер -->
+    <footer class="py-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <h5 class="mb-3"><i class="fas fa-car me-2"></i>CarShareBsk</h5>
+                    <p class="text-light mb-3" style="line-height: 1.7;">
+                        Ваш надежный партнер в аренде автомобилей в Бийске.
+                        Качественный сервис и современный автопарк.
+                    </p>
+                    <p class="text-light mb-0"><i class="fas fa-clock me-2"></i>Круглосуточно, 7 дней в неделю</p>
+                </div>
+                <div class="col-lg-2 mb-4">
+                    <h6 class="mb-3">Навигация</h6>
+                    <ul class="list-unstyled footer-links">
+                        <li><a href="{{ url_for('index') }}">Главная</a></li>
+                        <li><a href="{{ url_for('cars') }}">Автомобили</a></li>
+                        <li><a href="{{ url_for('about') }}">О нас</a></li>
+                        <li><a href="{{ url_for('contacts') }}">Контакты</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 mb-4">
+                    <h6 class="mb-3">Контакты</h6>
+                    <ul class="list-unstyled text-light" style="line-height: 2;">
+                        <li><i class="fas fa-phone me-2"></i>+7 (3854) 12-34-56</li>
+                        <li><i class="fas fa-envelope me-2"></i>info@carsharebsk.ru</li>
+                        <li><i class="fas fa-map-marker-alt me-2"></i>г. Бийск, ул. Ленина, 123</li>
+                        <li><i class="fas fa-clock me-2"></i>Круглосуточная поддержка</li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 mb-4">
+                    <h6 class="mb-3">Помощь</h6>
+                    <ul class="list-unstyled footer-links">
+                        <li><a href="{{ url_for('contacts') }}">Техническая поддержка</a></li>
+                        <li><a href="{{ url_for('about') }}">Как это работает</a></li>
+                        <li><a href="{{ url_for('cars') }}">Выбор автомобиля</a></li>
+                        <li><a href="{{ url_for('register') }}">Регистрация</a></li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="bg-light my-4">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="text-light mb-0">&copy; 2025 CarShareBsk. Все права защищены.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-light mb-0">Сделано с <i class="fas fa-heart text-danger"></i> для жителей Бийска</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+    <!-- Скрипт для проверки работы кнопок -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('Страница загружена');
+
+        // Проверяем все ссылки
+        const allLinks = document.querySelectorAll('a');
+        allLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                console.log('Клик по ссылке:', this.href);
+            });
+
+            // Добавляем стиль при наведении
+            link.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-1px)';
+            });
+
+            link.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
+        });
+
+        // Специальная проверка для кнопки "Начать аренду"
+        const startRentBtn = document.querySelector('.hero-section .btn');
+        if (startRentBtn) {
+            console.log('Кнопка "Начать аренду" найдена:', startRentBtn.href);
+
+            startRentBtn.addEventListener('click', function(e) {
+                console.log('Клик по кнопке "Начать аренду"');
+            });
+
+            // Яркая анимация при наведении
+            startRentBtn.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-3px) scale(1.02)';
+                this.style.boxShadow = '0 12px 30px rgba(255, 255, 255, 0.4)';
+            });
+
+            startRentBtn.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0) scale(1)';
+                this.style.boxShadow = '0 4px 15px rgba(255, 255, 255, 0.2)';
+            });
+        }
+    });
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

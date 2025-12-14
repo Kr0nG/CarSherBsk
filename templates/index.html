@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Герой секция -->
+<section class="hero-section">
+    <div class="container text-center">
+        <h1 class="display-4 mb-4">Каршеринг нового поколения в Бийске</h1>
+        <p class="lead mb-4">Современный сервис каршеринга для комфортных поездок по городу и за его пределами. Мы предлагаем широкий выбор автомобилей разных классов по доступным ценам. Присоединяйтесь к нашему сообществу и откройте новые возможности мобильности!</p>
+        <a href="{{ url_for('cars') }}" class="btn btn-light btn-lg px-5 py-3" style="font-size: 1.2rem; font-weight: 600;">
+            <i class="fas fa-play-circle me-2"></i>Начать аренду
+        </a>
+    </div>
+</section>
+
+<!-- Популярные автомобили -->
+<section class="py-5">
+    <div class="container">
+        <h2 class="text-center mb-5 section-title">Популярные автомобили</h2>
+        <div class="row">
+            {% for car in cars %}
+            <div class="col-md-4 mb-4">
+                <div class="card car-card h-100">
+                    <div class="position-relative">
+                        <img src="{{ car.image_url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}"
+                             style="height: 200px; object-fit: cover;">
+                        <span class="badge-car-class badge
+                            {% if car.car_class == 'Эконом' %}bg-success
+                            {% elif car.car_class == 'Комфорт' %}bg-primary
+                            {% elif car.car_class == 'Премиум' %}bg-warning
+                            {% else %}bg-secondary{% endif %}">
+                            {{ car.car_class }}
+                        </span>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title">{{ car.brand }} {{ car.model }}</h5>
+                        <p class="card-text text-muted mb-2">{{ car.year }} год • {{ car.fuel_type }} • {{ car.transmission }}</p>
+                        <p class="card-text small text-muted flex-grow-1">{{ car.description[:100] }}...</p>
+
+                        <div class="mt-auto">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <span class="h5 text-primary">{{ car.daily_price }} ₽</span>
+                                    <small class="text-muted d-block">/ сутки</small>
+                                </div>
+                                {% if current_user.is_authenticated %}
+                                <a href="{{ url_for('car_detail', car_id=car.id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-calendar-check me-1"></i> Забронировать
+                                </a>
+                                {% else %}
+                                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-sign-in-alt me-1"></i> Войти для брони
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="text-center mt-4">
+            <a href="{{ url_for('cars') }}" class="btn btn-outline-primary btn-lg">
+                <i class="fas fa-car me-2"></i>Смотреть все автомобили
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Преимущества -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h2 class="text-center mb-5 section-title">Почему выбирают нас?</h2>
+        <div class="row">
+            <div class="col-md-3 text-center mb-4">
+                <div class="feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h4>Быстро</h4>
+                <p class="text-muted">Бронирование автомобиля за 2 минуты через мобильное приложение или сайт</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="feature-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h4>Надежно</h4>
+                <p class="text-muted">Все автомобили застрахованы, проходят регулярное ТО и технический осмотр</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="feature-icon">
+                    <i class="fas fa-piggy-bank"></i>
+                </div>
+                <h4>Выгодно</h4>
+                <p class="text-muted">Лучшие цены на аренду без скрытых платежей и комиссий</p>
+            </div>
+            <div class="col-md-3 text-center mb-4">
+                <div class="feature-icon">
+                    <i class="fas fa-map-marker-alt"></i>
+                </div>
+                <h4>Удобно</h4>
+                <p class="text-muted">Пункты выдачи по всему городу, включая аэропорт и ж/д вокзал</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Как это работает -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <h2 class="text-center mb-5 section-title">Как это работает?</h2>
+        <div class="row">
+            <div class="col-md-4 text-center mb-4">
+                <div class="step-number">1</div>
+                <h4>Выберите автомобиль</h4>
+                <p class="text-muted">Подберите автомобиль по классу, цене и характеристикам в нашем каталоге</p>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="step-number">2</div>
+                <h4>Забронируйте онлайн</h4>
+                <p class="text-muted">Выберите даты аренды и оформите бронирование в несколько кликов</p>
+            </div>
+            <div class="col-md-4 text-center mb-4">
+                <div class="step-number">3</div>
+                <h4>Получите ключи</h4>
+                <p class="text-muted">Заберите автомобиль в удобной локации в и начинайте поездку</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Призыв к действию -->
+<section class="py-5 bg-primary text-white">
+    <div class="container text-center">
+        <h2 class="mb-4">Готовы начать поездку?</h2>
+        <p class="lead mb-4">Присоединяйтесь к тысячам довольных клиентов в Бийске</p>
+        <a href="{{ url_for('register') }}" class="btn btn-light btn-lg px-5 py-3 me-3">
+            <i class="fas fa-user-plus me-2"></i>Зарегистрироваться
+        </a>
+        <a href="{{ url_for('cars') }}" class="btn btn-outline-light btn-lg px-5 py-3">
+            <i class="fas fa-car me-2"></i>Выбрать автомобиль
+        </a>
+    </div>
+</section>
+{% endblock %}

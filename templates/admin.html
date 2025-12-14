@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">Админ панель</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>{{ total_cars }}</h3>
+                    <p>Автомобилей</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>{{ total_users }}</h3>
+                    <p>Пользователей</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body text-center">
+                    <h3>{{ active_bookings }}</h3>
+                    <p>Активных броней</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body text-center">
+                    <h3>{{ total_revenue }} ₽</h3>
+                    <p>Общий доход</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для редактирования автомобиля -->
+    <div class="modal fade" id="editCarModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Редактировать автомобиль</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editCarForm">
+                        <input type="hidden" id="editCarId" name="car_id">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Марка</label>
+                                <input type="text" class="form-control" id="editBrand" name="brand" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Модель</label>
+                                <input type="text" class="form-control" id="editModel" name="model" required>
+                            </div>
+
+                            <div class="col-md-4">
+                                <label class="form-label">Год</label>
+                                <input type="number" class="form-control" id="editYear" name="year" min="2000" max="2030" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Цена/день (₽)</label>
+                                <input type="number" class="form-control" id="editDailyPrice" name="daily_price" step="0.01" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Класс</label>
+                                <select class="form-select" id="editCarClass" name="car_class" required>
+                                    <option value="Эконом">Эконом</option>
+                                    <option value="Комфорт">Комфорт</option>
+                                    <option value="Премиум">Премиум</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Топливо</label>
+                                <select class="form-select" id="editFuelType" name="fuel_type" required>
+                                    <option value="Бензин">Бензин</option>
+                                    <option value="Дизель">Дизель</option>
+                                    <option value="Электричество">Электричество</option>
+                                    <option value="Гибрид">Гибрид</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">КПП</label>
+                                <select class="form-select" id="editTransmission" name="transmission" required>
+                                    <option value="Автомат">Автомат</option>
+                                    <option value="Механика">Механика</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Расход топлива</label>
+                                <input type="text" class="form-control" id="editConsumption" name="consumption" placeholder="6.5 л/100км" required>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Двигатель</label>
+                                <input type="text" class="form-control" id="editEngine" name="engine" placeholder="1.6L">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Цвет</label>
+                                <input type="text" class="form-control" id="editColor" name="color">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Мест</label>
+                                <input type="number" class="form-control" id="editSeats" name="seats" min="2" max="9" value="5">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Расположение</label>
+                                <input type="text" class="form-control" id="editLocation" name="location">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Изображение (URL)</label>
+                                <input type="url" class="form-control" id="editImageUrl" name="image_url" required>
+                                <div class="form-text">Введите URL изображения автомобиля</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Особенности (через запятую)</label>
+                                <input type="text" class="form-control" id="editFeatures" name="features"
+                                       placeholder="Кондиционер, Bluetooth, Парктроники, Камера заднего вида">
+                                <div class="form-text">Укажите особенности автомобиля через запятую</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Описание</label>
+                                <textarea class="form-control" id="editDescription" name="description" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" onclick="saveCarChanges()">Сохранить изменения</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для подтверждения удаления -->
+    <div class="modal fade" id="deleteCarModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Подтверждение удаления</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="deleteCarText">Вы уверены, что хотите удалить этот автомобиль?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-danger" onclick="confirmDeleteCar()">Удалить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Форма добавления автомобиля -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Добавить автомобиль</h5>
+        </div>
+        <div class="card-body">
+            <form id="addCarForm">
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label">Марка</label>
+                        <input type="text" class="form-control" name="brand" placeholder="Марка" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Модель</label>
+                        <input type="text" class="form-control" name="model" placeholder="Модель" required>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">Год</label>
+                        <input type="number" class="form-control" name="year" placeholder="Год" min="2000" max="2030" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Цена/день (₽)</label>
+                        <input type="number" class="form-control" name="daily_price" placeholder="Цена" step="0.01" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Класс</label>
+                        <select class="form-select" name="car_class" required>
+                            <option value="">Выберите класс</option>
+                            <option value="Эконом">Эконом</option>
+                            <option value="Комфорт">Комфорт</option>
+                            <option value="Премиум">Премиум</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Топливо</label>
+                        <select class="form-select" name="fuel_type" required>
+                            <option value="">Выберите топливо</option>
+                            <option value="Бензин">Бензин</option>
+                            <option value="Дизель">Дизель</option>
+                            <option value="Электричество">Электричество</option>
+                            <option value="Гибрид">Гибрид</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-1">
+                        <label class="form-label">КПП</label>
+                        <select class="form-select" name="transmission" required>
+                            <option value="">Выберите</option>
+                            <option value="Автомат">Автомат</option>
+                            <option value="Механика">Механика</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Дополнительные поля (вторая строка) -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Особенности (через запятую)</label>
+                        <input type="text" class="form-control" name="features"
+                               placeholder="Кондиционер, Bluetooth, Парктроники, Камера заднего вида">
+                        <div class="form-text">Укажите особенности автомобиля через запятую</div>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Двигатель</label>
+                        <input type="text" class="form-control" name="engine" placeholder="1.6L">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Расход топлива</label>
+                        <input type="text" class="form-control" name="consumption" placeholder="6.5 л/100км">
+                    </div>
+                </div>
+
+                <!-- Третья строка -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <label class="form-label">Цвет</label>
+                        <input type="text" class="form-control" name="color" placeholder="Цвет">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Мест</label>
+                        <input type="number" class="form-control" name="seats" placeholder="Места" min="2" max="9" value="5">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Расположение</label>
+                        <input type="text" class="form-control" name="location" placeholder="ул. Ленина, 123">
+                    </div>
+                </div>
+
+                <!-- Четвертая строка -->
+                <div class="row g-3 mt-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Ссылка на фото</label>
+                        <input type="url" class="form-control" name="image_url" placeholder="https://example.com/photo.jpg" required>
+                        <div class="form-text">Обязательное поле</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" name="description" placeholder="Описание автомобиля" rows="2"></textarea>
+                    </div>
+                </div>
+
+                <!-- Кнопка добавления -->
+                <div class="row g-3 mt-3">
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Добавить</button>
+                    </div>
+                </div>
+            </form>
+            <div id="addCarResult" class="mt-2"></div>
+        </div>
+    </div>
+
+    <!-- Управление автомобилями -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Управление автомобилями</h5>
+            <div class="d-flex align-items-center">
+                <input type="text" id="searchCars" class="form-control form-control-sm me-2" style="width: 200px;" placeholder="Поиск автомобилей...">
+                <span class="badge bg-secondary">{{ total_cars }} всего</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Автомобиль</th>
+                            <th>Год</th>
+                            <th>Класс</th>
+                            <th>Цена</th>
+                            <th>Статус</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="carsTableBody">
+                        {% for car in all_cars %}
+                        <tr data-car-id="{{ car.id }}">
+                            <td><small class="text-muted">#{{ car.id }}</small></td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <img src="{{ car.image_url }}" alt="{{ car.brand }} {{ car.model }}"
+                                         class="rounded me-2" style="width: 40px; height: 30px; object-fit: cover;">
+                                    <div>
+                                        <strong>{{ car.brand }} {{ car.model }}</strong>
+                                        <div class="text-muted small">{{ car.fuel_type }}, {{ car.transmission }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ car.year }}</td>
+                            <td><span class="badge bg-info">{{ car.car_class }}</span></td>
+                            <td><strong>{{ car.daily_price }} ₽</strong></td>
+                            <td>
+                                {% if car.is_available %}
+                                <span class="badge bg-success">Доступен</span>
+                                {% else %}
+                                <span class="badge bg-danger">Недоступен</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editCar({{ car.id }})"
+                                            title="Редактировать">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" onclick="toggleCar({{ car.id }})"
+                                            title="{% if car.is_available %}Сделать недоступным{% else %}Сделать доступным{% endif %}">
+                                        <i class="fas fa-toggle-{% if car.is_available %}on{% else %}off{% endif %}"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteCar({{ car.id }}, '{{ car.brand }} {{ car.model }}')"
+                                            title="Удалить">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <small class="text-muted">Нажмите на иконку карандаша для редактирования</small>
+                <small class="text-muted">Показано {{ all_cars|length }} автомобилей</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let carToDelete = null;
+
+// Добавление автомобиля
+document.getElementById('addCarForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Добавление...';
+    submitBtn.disabled = true;
+
+    fetch('{{ url_for("add_car") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultDiv = document.getElementById('addCarResult');
+        if (data.success) {
+            resultDiv.innerHTML = '<div class="alert alert-success">' + data.message + '</div>';
+            this.reset();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            resultDiv.innerHTML = '<div class="alert alert-danger">' + data.message + '</div>';
+        }
+    })
+    .catch(error => {
+        document.getElementById('addCarResult').innerHTML = '<div class="alert alert-danger">Ошибка сети</div>';
+    })
+    .finally(() => {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+});
+
+// Редактирование автомобиля
+function editCar(carId) {
+    const editBtn = event.currentTarget;
+    const originalHtml = editBtn.innerHTML;
+    editBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    editBtn.disabled = true;
+
+    fetch('/admin/get_car/' + carId)
+    .then(response => response.json())
+    .then(data => {
+        editBtn.innerHTML = originalHtml;
+        editBtn.disabled = false;
+
+        if (data.success) {
+            const car = data.car;
+            document.getElementById('editCarId').value = car.id;
+            document.getElementById('editBrand').value = car.brand;
+            document.getElementById('editModel').value = car.model;
+            document.getElementById('editYear').value = car.year;
+            document.getElementById('editDailyPrice').value = car.daily_price;
+            document.getElementById('editCarClass').value = car.car_class;
+            document.getElementById('editFuelType').value = car.fuel_type;
+            document.getElementById('editTransmission').value = car.transmission;
+            document.getElementById('editConsumption').value = car.consumption || '';
+            document.getElementById('editEngine').value = car.engine || '';
+            document.getElementById('editColor').value = car.color || '';
+            document.getElementById('editSeats').value = car.seats || 5;
+            document.getElementById('editLocation').value = car.location || '';
+            document.getElementById('editDescription').value = car.description || '';
+            document.getElementById('editImageUrl').value = car.image_url || '';
+
+            // Преобразуем массив особенностей в строку
+            if (car.features && Array.isArray(car.features)) {
+                document.getElementById('editFeatures').value = car.features.join(', ');
+            } else {
+                document.getElementById('editFeatures').value = '';
+            }
+
+            const editModal = new bootstrap.Modal(document.getElementById('editCarModal'));
+            editModal.show();
+        } else {
+            alert('Ошибка: ' + data.message);
+        }
+    })
+    .catch(error => {
+        editBtn.innerHTML = originalHtml;
+        editBtn.disabled = false;
+        alert('Ошибка сети при получении данных автомобиля');
+    });
+}
+
+// Сохранение изменений автомобиля
+function saveCarChanges() {
+    const carId = document.getElementById('editCarId').value;
+    const formData = new FormData(document.getElementById('editCarForm'));
+
+    const saveBtn = document.querySelector('#editCarModal .btn-primary');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Сохранение...';
+    saveBtn.disabled = true;
+
+    fetch('/admin/update_car/' + carId, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const editModal = bootstrap.Modal.getInstance(document.getElementById('editCarModal'));
+            editModal.hide();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Ошибка: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Ошибка сети при сохранении изменений');
+    })
+    .finally(() => {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    });
+}
+
+// Подготовка к удалению автомобиля
+function deleteCar(carId, carName) {
+    carToDelete = carId;
+    document.getElementById('deleteCarText').textContent =
+        `Вы уверены, что хотите удалить автомобиль "${carName}"? Это действие нельзя отменить.`;
+
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteCarModal'));
+    deleteModal.show();
+}
+
+// Подтверждение удаления
+function confirmDeleteCar() {
+    if (!carToDelete) return;
+
+    const deleteBtn = document.querySelector('#deleteCarModal .btn-danger');
+    const originalText = deleteBtn.innerHTML;
+    deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Удаление...';
+    deleteBtn.disabled = true;
+
+    fetch('/admin/delete_car/' + carToDelete, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            const deleteModal = bootstrap.Modal.getInstance(document.getElementById('deleteCarModal'));
+            deleteModal.hide();
+            setTimeout(() => location.reload(), 500);
+        } else {
+            alert('Ошибка: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Ошибка сети при удалении автомобиля');
+    })
+    .finally(() => {
+        deleteBtn.innerHTML = originalText;
+        deleteBtn.disabled = false;
+        carToDelete = null;
+    });
+}
+
+// Переключение статуса автомобиля
+function toggleCar(carId) {
+    if (!confirm('Вы уверены, что хотите изменить статус доступности автомобиля?')) return;
+
+    const toggleBtn = event.currentTarget;
+    const originalHtml = toggleBtn.innerHTML;
+    toggleBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    toggleBtn.disabled = true;
+
+    fetch('/admin/toggle_car/' + carId, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        toggleBtn.innerHTML = originalHtml;
+        toggleBtn.disabled = false;
+
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        toggleBtn.innerHTML = originalHtml;
+        toggleBtn.disabled = false;
+        alert('Ошибка сети');
+    });
+}
+
+// Поиск автомобилей
+document.getElementById('searchCars').addEventListener('input', function(e) {
+    const searchTerm = e.target.value.toLowerCase();
+    const rows = document.querySelectorAll('#carsTableBody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(searchTerm)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+</script>
+
+<style>
+.table img {
+    transition: transform 0.2s;
+}
+.table img:hover {
+    transform: scale(1.5);
+    z-index: 1000;
+    position: relative;
+}
+.btn-group .btn {
+    border-radius: 4px !important;
+    margin-right: 2px;
+}
+.modal-lg {
+    max-width: 800px;
+}
+</style>
+{% endblock %}

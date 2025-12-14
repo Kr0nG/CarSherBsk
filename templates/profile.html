@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">Личный кабинет</h1>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Информация о пользователе</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Имя пользователя:</strong> {{ current_user.username }}</p>
+                    <p><strong>Email:</strong> {{ current_user.email }}</p>
+                    <p><strong>Телефон:</strong> {{ current_user.phone or 'Не указан' }}</p>
+                    <p><strong>Водительское удостоверение:</strong> {{ current_user.driver_license or 'Не указано' }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Мои бронирования</h5>
+                </div>
+                <div class="card-body">
+                    {% if bookings %}
+                        {% for booking in bookings %}
+                        <div class="border-bottom pb-3 mb-3">
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <img src="{{ booking.image_url }}" alt="{{ booking.brand }} {{ booking.model }}"
+                                         class="img-fluid rounded" style="max-height: 80px;">
+                                </div>
+                                <div class="col-md-8">
+                                    <p><strong>Автомобиль:</strong> {{ booking.brand }} {{ booking.model }}</p>
+                                    <p><strong>Период:</strong> {{ booking.start_date }} - {{ booking.end_date }}</p>
+                                    <p><strong>Стоимость:</strong> {{ booking.total_price }} ₽</p>
+                                    <p><strong>Статус:</strong>
+                                        {% if booking.status == 'active' %}
+                                        <span class="badge bg-success">Активно</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ booking.status }}</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                                <div class="col-md-2">
+                                    {% if booking.status == 'active' %}
+                                    <form method="POST" action="{{ url_for('cancel_booking', booking_id=booking.id) }}"
+                                          onsubmit="return confirm('Вы уверены, что хотите отменить бронирование?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">
+                                            <i class="fas fa-times"></i> Отменить
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-center text-muted">У вас пока нет бронирований</p>
+                        <div class="text-center">
+                            <a href="{{ url_for('cars') }}" class="btn btn-primary">
+                                <i class="fas fa-car"></i> Выбрать автомобиль
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

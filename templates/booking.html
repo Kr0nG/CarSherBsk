@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-6">
+            <img src="{{ car.image_url }}" class="img-fluid rounded" alt="{{ car.brand }} {{ car.model }}">
+        </div>
+        <div class="col-md-6">
+            <h2>{{ car.brand }} {{ car.model }}</h2>
+            <p class="text-muted">{{ car.year }} год</p>
+
+            <div class="mb-4">
+                <h4 class="text-primary">{{ car.daily_price }} ₽/день</h4>
+            </div>
+
+            <div class="mb-4">
+                <h5>Характеристики:</h5>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-palette"></i> Цвет: {{ car.color or 'Не указан' }}</li>
+                    <li><i class="fas fa-gas-pump"></i> Топливо: {{ car.fuel_type }}</li>
+                    <li><i class="fas fa-cog"></i> КПП: {{ car.transmission }}</li>
+                    <li><i class="fas fa-user-friends"></i> Мест: {{ car.seats }}</li>
+                    <li><i class="fas fa-map-marker-alt"></i> {{ car.location }}</li>
+                </ul>
+            </div>
+
+            <div class="booking-form">
+                <h5>Бронирование</h5>
+                <form id="bookingForm">
+                    <input type="hidden" name="car_id" value="{{ car.id }}">
+                    <div class="mb-3">
+                        <label for="start_date" class="form-label">Дата начала</label>
+                        <input type="date" class="form-control" id="start_date" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="end_date" class="form-label">Дата окончания</label>
+                        <input type="date" class="form-control" id="end_date" name="end_date" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                        <i class="fas fa-calendar-check me-1"></i> Забронировать
+                    </button>
+                </form>
+                <div id="bookingResult" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+
+    {% if similar_cars %}
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3>Похожие автомобили</h3>
+            <div class="row">
+                {% for similar_car in similar_cars %}
+                <div class="col-md-4 mb-4">
+                    <div class="card car-card">
+                        <img src="{{ similar_car.image_url }}" class="card-img-top" alt="{{ similar_car.brand }} {{ similar_car.model }}"
+                             style="height: 200px; object-fit: cover;">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ similar_car.brand }} {{ similar_car.model }}</h5>
+                            <p class="card-text">
+                                <small class="text-muted">
+                                    {{ similar_car.year }} год • {{ similar_car.fuel_type }} • {{ similar_car.transmission }}
+                                </small>
+                            </p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="h5 text-primary">{{ similar_car.daily_price }} ₽/день</span>
+                                <a href="{{ url_for('car_detail', car_id=similar_car.id) }}" class="btn btn-outline-primary">Выбрать</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const bookingForm = document.getElementById('bookingForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultDiv = document.getElementById('bookingResult');
+
+    // Установка минимальной даты как сегодня
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('start_date').min = today;
+    document.getElementById('end_date').min = today;
+
+    // Сброс состояния кнопки при изменении дат
+    document.getElementById('start_date').addEventListener('change', resetFormState);
+    document.getElementById('end_date').addEventListener('change', resetFormState);
+
+    function resetFormState() {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-calendar-check me-1"></i> Забронировать';
+        resultDiv.innerHTML = '';
+    }
+
+    bookingForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const startDate = document.getElementById('start_date').value;
+        const endDate = document.getElementById('end_date').value;
+
+        // Базовая валидация дат
+        if (!startDate || !endDate) {
+            showResult('Пожалуйста, выберите обе даты', 'danger');
+            return;
+        }
+
+        if (new Date(startDate) > new Date(endDate)) {
+            showResult('Дата окончания не может быть раньше даты начала', 'danger');
+            return;
+        }
+
+        // Показываем загрузку
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Бронирование...';
+
+        const formData = new FormData(this);
+
+        fetch('{{ url_for("book_car") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showResult(data.message, 'success');
+                bookingForm.reset();
+                // Перенаправляем в профиль через 2 секунды
+                setTimeout(() => {
+                    window.location.href = '{{ url_for("profile") }}';
+                }, 2000);
+            } else {
+                showResult(data.message, 'danger');
+                // Восстанавливаем кнопку при ошибке
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-calendar-check me-1"></i> Забронировать';
+            }
+        })
+        .catch(error => {
+            showResult('Ошибка сети. Пожалуйста, попробуйте еще раз.', 'danger');
+            // Восстанавливаем кнопку при ошибке сети
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-calendar-check me-1"></i> Забронировать';
+        });
+    });
+
+    function showResult(message, type) {
+        resultDiv.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>`;
+    }
+});
+</script>
+{% endblock %}

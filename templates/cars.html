@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Заголовок и статистика -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="section-title mb-3">Наш автопарк</h1>
+            <p class="text-muted mb-0">Выберите идеальный автомобиль для вашей поездки</p>
+        </div>
+        <div class="text-end">
+            <div class="text-muted">Найдено автомобилей: <strong class="text-primary">{{ cars|length }}</strong></div>
+            <small class="text-muted">Из {{ test_cars_count }} всего</small>
+        </div>
+    </div>
+
+    <!-- Информация о классах автомобилей -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Классы автомобилей</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-success me-2">Эконом</span>
+                        <strong>от 900 ₽/сутки</strong>
+                    </div>
+                    <p class="small text-muted mb-0">Идеально для городских поездок. Низкий расход топлива, все необходимое для комфорта.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-primary me-2">Комфорт</span>
+                        <strong>от 1800 ₽/сутки</strong>
+                    </div>
+                    <p class="small text-muted mb-0">Просторные салоны, дополнительные опции. Для деловых поездок и путешествий.</p>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="badge bg-warning me-2">Премиум</span>
+                        <strong>от 3500 ₽/сутки</strong>
+                    </div>
+                    <p class="small text-muted mb-0">Премиальные бренды, максимальный комфорт и технологии. Для особых случаев.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Фильтры -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Фильтры</h5>
+        </div>
+        <div class="card-body">
+            <form method="GET" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Класс автомобиля</label>
+                    <select name="class" class="form-select">
+                        <option value="all">Все классы</option>
+                        {% for class in car_classes %}
+                        <option value="{{ class }}" {% if selected_class == class %}selected{% endif %}>
+                            {{ class }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Коробка передач</label>
+                    <select name="transmission" class="form-select">
+                        <option value="all">Все типы</option>
+                        {% for transmission in transmissions %}
+                        <option value="{{ transmission }}" {% if selected_transmission == transmission %}selected{% endif %}>
+                            {{ transmission }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Тип топлива</label>
+                    <select name="fuel_type" class="form-select">
+                        <option value="all">Все типы</option>
+                        {% for fuel_type in fuel_types %}
+                        <option value="{{ fuel_type }}" {% if selected_fuel_type == fuel_type %}selected{% endif %}>
+                            {{ fuel_type }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">&nbsp;</label>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-search me-1"></i>Применить
+                        </button>
+                        <a href="{{ url_for('cars') }}" class="btn btn-outline-secondary">Сбросить</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Список автомобилей -->
+    {% if cars %}
+    <div class="row">
+        {% for car in cars %}
+        <div class="col-xl-4 col-lg-6 mb-4">
+            <div class="card car-card h-100">
+                <div class="position-relative">
+                    <img src="{{ car.image_url }}" class="card-img-top" alt="{{ car.brand }} {{ car.model }}">
+
+                    <!-- Бейдж класса -->
+                    <span class="badge-car-class badge
+                        {% if car.car_class == 'Эконом' %}bg-success
+                        {% elif car.car_class == 'Комфорт' %}bg-primary
+                        {% elif car.car_class == 'Премиум' %}bg-warning
+                        {% else %}bg-secondary{% endif %}">
+                        {{ car.car_class }}
+                    </span>
+
+                    <!-- Бейдж типа топлива -->
+                    <span class="fuel-badge badge
+                        {% if car.fuel_type == 'Электричество' %}bg-info
+                        {% elif car.fuel_type == 'Гибрид' %}bg-success
+                        {% elif car.fuel_type == 'Дизель' %}bg-dark
+                        {% else %}bg-secondary{% endif %}">
+                        <i class="fas
+                            {% if car.fuel_type == 'Электричество' %}fa-bolt
+                            {% elif car.fuel_type == 'Гибрид' %}fa-leaf
+                            {% elif car.fuel_type == 'Дизель' %}fa-oil-can
+                            {% else %}fa-gas-pump{% endif %} me-1">
+                        </i>
+                        {{ car.fuel_type }}
+                    </span>
+                </div>
+
+                <div class="card-body d-flex flex-column">
+                    <!-- Заголовок и основные характеристики -->
+                    <div class="mb-3">
+                        <h5 class="card-title mb-1">{{ car.brand }} {{ car.model }}</h5>
+                        <p class="card-text text-muted mb-2">{{ car.year }} год • {{ car.engine }}</p>
+                        <p class="card-text small text-muted mb-0">{{ car.description }}</p>
+                    </div>
+
+                    <!-- Детальные характеристики -->
+                    <div class="car-specs mb-3 flex-grow-1">
+                        <div class="row g-2 small text-muted">
+                            <div class="col-6">
+                                <i class="fas fa-cog me-1"></i> {{ car.transmission }}
+                            </div>
+                            <div class="col-6">
+                                <i class="fas fa-user-friends me-1"></i> {{ car.seats }} мест
+                            </div>
+                            <div class="col-6">
+                                <i class="fas fa-tachometer-alt me-1"></i> {{ car.consumption }}
+                            </div>
+                            <div class="col-6">
+                                <i class="fas fa-palette me-1"></i> {{ car.color }}
+                            </div>
+                            <div class="col-12">
+                                <i class="fas fa-map-marker-alt me-1"></i> {{ car.location }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Особенности -->
+                    {% if car.features %}
+                    <div class="mb-3">
+                        <small class="text-muted fw-bold">Особенности:</small>
+                        <div class="car-features">
+                            {% for feature in car.features[:3] %}
+                            <span class="badge bg-light text-dark me-1 mb-1">{{ feature }}</span>
+                            {% endfor %}
+                            {% if car.features|length > 3 %}
+                            <span class="badge bg-light text-dark">+{{ car.features|length - 3 }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Цена и кнопка бронирования -->
+                    <div class="mt-auto">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="price-tag">{{ car.daily_price }} ₽</span>
+                                <small class="text-muted d-block">/ сутки</small>
+                            </div>
+                            <div>
+                                {% if current_user.is_authenticated and car.is_available %}
+                                <a href="{{ url_for('car_detail', car_id=car.id) }}" class="btn btn-primary btn-sm">
+                                    <i class="fas fa-calendar-check me-1"></i> Забронировать
+                                </a>
+                                {% elif not current_user.is_authenticated %}
+                                <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-sign-in-alt me-1"></i> Войти для брони
+                                </a>
+                                {% else %}
+                                <button class="btn btn-secondary btn-sm" disabled>
+                                    <i class="fas fa-times me-1"></i> Недоступен
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% else %}
+    <!-- Сообщение, если автомобили не найдены -->
+    <div class="text-center py-5">
+        <i class="fas fa-car fa-4x text-muted mb-3"></i>
+        <h3>Автомобили не найдены</h3>
+        <p class="text-muted mb-4">Попробуйте изменить параметры фильтрации или
+            <a href="{{ url_for('cars') }}" class="text-decoration-none">сбросить фильтры</a>
+        </p>
+        <div class="d-flex justify-content-center gap-3">
+            <a href="{{ url_for('cars') }}" class="btn btn-primary">
+                <i class="fas fa-redo me-1"></i> Сбросить фильтры
+            </a>
+            <a href="{{ url_for('contacts') }}" class="btn btn-outline-primary">
+                <i class="fas fa-headset me-1"></i> Связаться с нами
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filters = document.querySelectorAll('select[name="class"], select[name="transmission"], select[name="fuel_type"]');
+
+    filters.forEach(filter => {
+        filter.addEventListener('change', function() {
+            document.querySelector('form').submit();
+        });
+    });
+
+    if (window.location.search) {
+        setTimeout(() => {
+            const resultsElement = document.querySelector('.row');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    }
+});
+</script>
+{% endblock %}
