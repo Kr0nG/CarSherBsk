@@ -495,12 +495,26 @@ def admin_users():
     try:
         print(f"👥 Запрос списка пользователей от: {current_user.username}")
         
+        # Получаем всех пользователей
         users = execute_query('SELECT * FROM users ORDER BY created_at DESC') or []
         
         print(f"🔍 Найдено пользователей: {len(users)}")
         
-        for user in users:
-            print(f"   👤 {user['id']}: {user['username']} (admin: {user['is_admin']})")
+        # Получаем статистику бронирований для каждого пользователя
+        user_stats = {}
+        bookings_stats = execute_query('''
+            SELECT user_id, 
+                   COUNT(*) as total_bookings,
+                   SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_bookings
+            FROM bookings 
+            GROUP BY user_id
+        ''') or []
+        
+        for stat in bookings_stats:
+            user_stats[stat['user_id']] = {
+                'total': stat['total_bookings'],
+                'active': stat['active_bookings']
+            }
         
         # Статистика
         admin_count = execute_query("SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE")
@@ -509,7 +523,7 @@ def admin_users():
         print(f"📊 Админов: {admin_count[0]['count'] if admin_count else 0}, "
               f"Пользователей: {user_count[0]['count'] if user_count else 0}")
         
-        # Все бронирования
+        # Все бронирования для отображения
         all_bookings = execute_query('''
             SELECT b.*, u.username, u.email, c.brand, c.model, c.image_url 
             FROM bookings b
@@ -522,6 +536,7 @@ def admin_users():
         
         return render_template('admin_users.html',
                              users=users,
+                             user_stats=user_stats,  # Добавлено!
                              admin_count=admin_count[0]['count'] if admin_count else 0,
                              user_count=user_count[0]['count'] if user_count else 0,
                              bookings_db=all_bookings)
@@ -530,7 +545,11 @@ def admin_users():
         import traceback
         traceback.print_exc()
         return render_template('admin_users.html',
-                             users=[], admin_count=0, user_count=0, bookings_db=[])
+                             users=[], 
+                             user_stats={},  # Добавлено!
+                             admin_count=0, 
+                             user_count=0, 
+                             bookings_db=[])
 
 # ========== ДОПОЛНИТЕЛЬНЫЕ СТРАНИЦЫ ==========
 @app.route('/contacts')
