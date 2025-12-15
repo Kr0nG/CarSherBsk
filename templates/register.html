@@ -66,22 +66,15 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
     
-    if (password.length < 6) {
-        e.preventDefault();
-        alert('Пароль должен содержать не менее 6 символов');
-        return;
-    }
-    
+    // Простая проверка
     if (password !== confirmPassword) {
         e.preventDefault();
         alert('Пароли не совпадают. Пожалуйста, проверьте введенные пароли.');
         return false;
     }
-
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Регистрация...';
-    submitBtn.disabled = true;
+    
+    // Если пароли совпадают, форма отправится нормально
+    // Нет блокировки кнопки, чтобы не было зависаний
 });
 </script>
 {% endblock %}
