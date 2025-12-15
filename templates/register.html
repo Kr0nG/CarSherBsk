@@ -49,7 +49,9 @@
                                    required minlength="6">
                             <div class="form-text">Повторите пароль для подтверждения</div>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Зарегистрироваться</button>
+                        <button type="submit" class="btn btn-primary w-100" id="submitBtn">
+                            Зарегистрироваться
+                        </button>
                     </form>
                     <div class="text-center mt-3">
                         <p>Уже есть аккаунт? <a href="{{ url_for('login') }}">Войдите</a></p>
@@ -64,6 +66,8 @@
 document.getElementById('registerForm').addEventListener('submit', function(e) {
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirm_password').value;
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.innerHTML;
     
     // Проверка минимальной длины пароля
     if (password.length < 6) {
@@ -79,10 +83,21 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
         return;
     }
 
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.innerHTML;
+    // Показываем индикатор загрузки
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Регистрация...';
     submitBtn.disabled = true;
+    
+    // Форма будет отправлена, так как мы не вызвали preventDefault() при успешной проверке
 });
+
+// Восстановить состояние кнопки при изменении полей пароля
+document.getElementById('password').addEventListener('input', restoreButton);
+document.getElementById('confirm_password').addEventListener('input', restoreButton);
+
+function restoreButton() {
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.innerHTML = 'Зарегистрироваться';
+    submitBtn.disabled = false;
+}
 </script>
 {% endblock %}
