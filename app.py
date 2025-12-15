@@ -595,9 +595,9 @@ def cancel_booking(booking_id):
         cur = conn.cursor()
 
         cur.execute('''
-            UPDATE bookings SET status = 'cancelled'
-            WHERE id = %s AND user_id = %s AND status = 'active'
-        ''', (booking_id, current_user.id))
+            UPDATE bookings SET status = 'Отменено'
+            WHERE id = %s AND user_id = %s AND status = 'Активно'
+        ''', (booking_id, current_user.id))0
 
         if cur.rowcount == 0:
             flash('Бронирование не найдено или у вас нет прав для его отмены.', 'danger')
@@ -1014,8 +1014,8 @@ def admin_cancel_booking(booking_id):
 
         # Отменяем бронирование
         cur.execute('''
-            UPDATE bookings SET status = 'cancelled'
-            WHERE id = %s AND status = 'active'
+            UPDATE bookings SET status = 'Отменено'
+            WHERE id = %s AND status = 'Активно'
             RETURNING id
         ''', (booking_id,))
 
