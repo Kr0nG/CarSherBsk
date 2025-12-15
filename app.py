@@ -263,14 +263,8 @@ def register():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
-        confirm_password = request.form['confirm_password']
         phone = request.form['phone']
         driver_license = request.form['driver_license']
-
-        # Проверка подтверждения пароля
-        if password != confirm_password:
-            flash('Пароли не совпадают. Пожалуйста, проверьте введенные пароли.', 'danger')
-            return redirect(url_for('register'))
 
         try:
             conn = get_db_connection()
