@@ -19,10 +19,10 @@ login_manager.login_view = 'login'
 
 # Конфигурация PostgreSQL из переменных окружения
 DB_CONFIG = {
-    'dbname': 'postgres18',
-    'user': 'postgres18_user',
-    'password': 'O9xtslQ40gB97zgcQp01pKAiA4RlcAx5',
-    'host': 'dpg-d4vguk1r0fns739lmkfg-a.virginia-postgres.render.com',
+    'dbname': 'carsharing_gg29',
+    'user': 'postgre',
+    'password': 'CT0s2HSM3WpzFqmnRdWRRjDJriS3PlW4',
+    'host': 'dpg-d4vqh2vpm1nc73btsd1g-a.oregon-postgres.render.com',
     'port': '5432'
 
 }
