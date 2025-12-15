@@ -75,7 +75,7 @@ document.getElementById('registerForm').addEventListener('submit', function(e) {
     if (password !== confirmPassword) {
         e.preventDefault();
         alert('Пароли не совпадают. Пожалуйста, проверьте введенные пароли.');
-        return;
+        return false;
     }
 
     const submitBtn = this.querySelector('button[type="submit"]');
