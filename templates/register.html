@@ -1,3 +1,5 @@
+[file name]: register.html
+[file content begin]
 {% extends "base.html" %}
 
 {% block content %}
@@ -43,6 +45,12 @@
                                    required minlength="6">
                             <div class="form-text">Не менее 6 символов</div>
                         </div>
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Подтверждение пароля *</label>
+                            <input type="password" class="form-control" id="confirm_password" name="confirm_password"
+                                   required minlength="6">
+                            <div class="form-text">Повторите пароль для подтверждения</div>
+                        </div>
                         <button type="submit" class="btn btn-primary w-100">Зарегистрироваться</button>
                     </form>
                     <div class="text-center mt-3">
@@ -57,9 +65,17 @@
 <script>
 document.getElementById('registerForm').addEventListener('submit', function(e) {
     const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirm_password').value;
+    
     if (password.length < 6) {
         e.preventDefault();
         alert('Пароль должен содержать не менее 6 символов');
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        e.preventDefault();
+        alert('Пароли не совпадают. Пожалуйста, проверьте введенные пароли.');
         return;
     }
 
