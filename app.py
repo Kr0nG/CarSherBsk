@@ -595,8 +595,8 @@ def cancel_booking(booking_id):
         cur = conn.cursor()
 
         cur.execute('''
-            UPDATE bookings SET status = 'Отменено'
-            WHERE id = %s AND user_id = %s AND status = 'Активно'
+            UPDATE bookings SET status = 'cancelled'
+            WHERE id = %s AND user_id = %s AND status = 'active'
         ''', (booking_id, current_user.id))
 
         if cur.rowcount == 0:
@@ -1014,8 +1014,8 @@ def admin_cancel_booking(booking_id):
 
         # Отменяем бронирование
         cur.execute('''
-            UPDATE bookings SET status = 'Отменено'
-            WHERE id = %s AND status = 'Активно'
+            UPDATE bookings SET status = 'cancelled'
+            WHERE id = %s AND status = 'active'
             RETURNING id
         ''', (booking_id,))
 
