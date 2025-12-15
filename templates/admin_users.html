@@ -88,7 +88,7 @@
                             </td>
                             <td>
                                 {% if not user.is_admin and user.id != current_user.id %}
-                                <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, {{ user.username|tojson }}, {{ user_stats.active }})"
+                                <button class="btn btn-sm btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.username }}', {{ user_stats.active }})"
                                         title="{% if user_stats.active > 0 %}Есть активные бронирования{% endif %}">
                                     <i class="fas fa-trash me-1"></i> Удалить
                                 </button>
