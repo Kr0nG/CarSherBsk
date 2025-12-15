@@ -190,7 +190,7 @@ def load_test_data_once():
                     'image_url': 'https://www.thedrive.com/wp-content/uploads/2024/10/tgI7q.jpg?w=1819&h=1023',
                     'is_available': True,
                     'color': 'Черный',
-                    'description': 'Представительский седан бизнес-класса.',
+                    'description': 'Представительский седан бизнес  класса.',
                     'car_class': 'Премиум',
                     'features': ['Память сидений', 'Массаж сидений', 'Адаптивный круиз', 'Проекционный дисплей'],
                     'engine': '3.0L',
@@ -263,8 +263,14 @@ def register():
         username = request.form['username']
         email = request.form['email']
         password = request.form['password']
+        confirm_password = request.form['confirm_password']
         phone = request.form['phone']
         driver_license = request.form['driver_license']
+
+        # Проверка совпадения паролей
+        if password != confirm_password:
+            flash('Пароли не совпадают. Пожалуйста, введите одинаковые пароли в оба поля.', 'danger')
+            return redirect(url_for('register'))
 
         try:
             conn = get_db_connection()
