@@ -597,7 +597,7 @@ def cancel_booking(booking_id):
         cur.execute('''
             UPDATE bookings SET status = 'Отменено'
             WHERE id = %s AND user_id = %s AND status = 'Активно'
-        ''', (booking_id, current_user.id))0
+        ''', (booking_id, current_user.id))
 
         if cur.rowcount == 0:
             flash('Бронирование не найдено или у вас нет прав для его отмены.', 'danger')
