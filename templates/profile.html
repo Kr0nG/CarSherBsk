@@ -4,6 +4,34 @@
 <div class="container mt-5">
     <h1 class="mb-4">Личный кабинет</h1>
 
+    <!-- Статистика бронирований -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body text-center">
+                    <h3>{{ bookings|length }}</h3>
+                    <p>Всего бронирований</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body text-center">
+                    <h3>{{ bookings|selectattr('status', 'equalto', 'active')|list|length }}</h3>
+                    <p>Активных</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-danger">
+                <div class="card-body text-center">
+                    <h3>{{ bookings|selectattr('status', 'equalto', 'cancelled')|list|length }}</h3>
+                    <p>Отменено</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
         <div class="col-md-4">
             <div class="card">
@@ -27,42 +55,51 @@
                 <div class="card-body">
                     {% if bookings %}
                         {% for booking in bookings %}
-                        <div class="border-bottom pb-3 mb-3">
+                        <div class="border-bottom pb-3 mb-3 {% if booking.status == 'cancelled' %}opacity-75{% endif %}">
                             <div class="row">
                                 <div class="col-md-2">
-                                    <img src="{{ booking.image_url }}" alt="{{ booking.brand }} {{ booking.model }}"
-                                         class="img-fluid rounded" style="max-height: 80px;">
+                                    <img src="{{ booking.car_image or 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=200&q=80' }}" 
+                                         alt="{{ booking.car_brand }} {{ booking.car_model }}"
+                                         class="img-fluid rounded" style="max-height: 80px; object-fit: cover;">
                                 </div>
                                 <div class="col-md-8">
-                                    <p><strong>Автомобиль:</strong> {{ booking.brand }} {{ booking.model }}</p>
+                                    <p><strong>Автомобиль:</strong> {{ booking.car_brand }} {{ booking.car_model }}</p>
                                     <p><strong>Период:</strong> {{ booking.start_date }} - {{ booking.end_date }}</p>
                                     <p><strong>Стоимость:</strong> {{ booking.total_price }} ₽</p>
                                     <p><strong>Статус:</strong>
                                         {% if booking.status == 'active' %}
                                         <span class="badge bg-success">Активно</span>
+                                        {% elif booking.status == 'cancelled' %}
+                                        <span class="badge bg-danger">Отменено</span>
                                         {% else %}
                                         <span class="badge bg-secondary">{{ booking.status }}</span>
                                         {% endif %}
                                     </p>
+                                    {% if booking.created_at %}
+                                    <p><small class="text-muted">Дата бронирования: {{ booking.created_at.split(' ')[0] }}</small></p>
+                                    {% endif %}
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-2 text-end">
                                     {% if booking.status == 'active' %}
                                     <form method="POST" action="{{ url_for('cancel_booking', booking_id=booking.id) }}"
                                           onsubmit="return confirm('Вы уверены, что хотите отменить бронирование?');">
                                         <button type="submit" class="btn btn-danger btn-sm">
-                                            <i class="fas fa-times"></i> Отменить
+                                            <i class="fas fa-times me-1"></i> Отменить
                                         </button>
                                     </form>
+                                    {% elif booking.status == 'cancelled' %}
+                                    <span class="badge bg-secondary">Недоступно</span>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     {% else %}
-                        <p class="text-center text-muted">У вас пока нет бронирований</p>
-                        <div class="text-center">
+                        <div class="text-center py-4">
+                            <i class="fas fa-calendar-times fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">У вас пока нет бронирований</p>
                             <a href="{{ url_for('cars') }}" class="btn btn-primary">
-                                <i class="fas fa-car"></i> Выбрать автомобиль
+                                <i class="fas fa-car me-1"></i> Выбрать автомобиль
                             </a>
                         </div>
                     {% endif %}
