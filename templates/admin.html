@@ -309,7 +309,15 @@
                                 </div>
                             </td>
                             <td>{{ car.year }}</td>
-                            <td><span class="badge bg-info">{{ car.car_class }}</span></td>
+                            <td>
+                                <span class="badge 
+                                    {% if car.car_class == 'Эконом' %}bg-success
+                                    {% elif car.car_class == 'Комфорт' %}bg-primary
+                                    {% elif car.car_class == 'Премиум' %}bg-warning
+                                    {% else %}bg-info{% endif %}">
+                                    {{ car.car_class }}
+                                </span>
+                            </td>
                             <td><strong>{{ car.daily_price }} ₽</strong></td>
                             <td>
                                 {% if car.is_available %}
