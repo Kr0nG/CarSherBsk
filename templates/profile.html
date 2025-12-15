@@ -41,7 +41,7 @@
                                         {% if booking.status == 'active' %}
                                         <span class="badge bg-success">Активно</span>
                                         {% else %}
-                                        <span class="badge bg-secondary">Отменено</span>
+                                        <span class="badge bg-secondary">{{ booking.status }}</span>
                                         {% endif %}
                                     </p>
                                 </div>
