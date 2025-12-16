@@ -210,15 +210,23 @@ def logout():
 # ОСНОВНЫЕ МАРШРУТЫ
 @app.route('/')
 def index():
-    # Главная страница с тремя доступными автомобилями
     with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT * FROM cars WHERE is_available = TRUE LIMIT 3')
-        cars = cur.fetchall()
+        cur.execute('''
+            SELECT c.*, COUNT(b.id) as booking_count
+            FROM cars c
+            LEFT JOIN bookings b ON c.id = b.car_id
+            WHERE c.is_available = TRUE
+            GROUP BY c.id
+            ORDER BY booking_count DESC
+            LIMIT 3
+        ''')
+        popular_cars = cur.fetchall()
         cur.execute('SELECT COUNT(*) as count FROM cars')
         total_cars = cur.fetchone()['count']
         cur.execute('SELECT COUNT(*) as count FROM users')
         total_users = cur.fetchone()['count']
-        return render_template('index.html', cars=cars, test_cars_count=total_cars, total_users=total_users)
+        return render_template('index.html', cars=popular_cars,
+                               test_cars_count=total_cars, total_users=total_users)
 
 
 @app.route('/cars')
