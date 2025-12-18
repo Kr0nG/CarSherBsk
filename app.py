@@ -4,32 +4,25 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from sqlalchemy import select
-from decimal import Decimal
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret')
 
-# Настройка базы данных через SQLAlchemy
+# Настройка базы данных
 app.config[
     'SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgre:CT0s2HSM3WpzFqmnRdWRRjDJriS3PlW4@dpg-d4vqh2vpm1nc73btsd1g-a.oregon-postgres.render.com:5432/carsharing_gg29'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_recycle': 300,
-    'pool_pre_ping': True,
-}
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {'pool_recycle': 300, 'pool_pre_ping': True}
 
 db = SQLAlchemy(app)
-
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
 
-# ========== МОДЕЛИ БАЗЫ ДАННЫХ ==========
-
+# ========== МОДЕЛИ ==========
 class User(db.Model, UserMixin):
     __tablename__ = 'users'
-
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
@@ -38,10 +31,7 @@ class User(db.Model, UserMixin):
     phone = db.Column(db.String(20))
     driver_license = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Отношение к бронированиям - УДАЛИТЕ старую строку и используйте эту
-    # bookings = db.relationship('Booking', backref='user_ref', lazy=True)  # УДАЛИТЕ ЭТО
-    bookings = db.relationship('Booking', backref='user', lazy=True, overlaps="booking_user,user_ref")
+    bookings = db.relationship('Booking', backref='user', lazy=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -52,7 +42,6 @@ class User(db.Model, UserMixin):
 
 class Car(db.Model):
     __tablename__ = 'cars'
-
     id = db.Column(db.Integer, primary_key=True)
     brand = db.Column(db.String(100), nullable=False)
     model = db.Column(db.String(100), nullable=False)
@@ -71,15 +60,11 @@ class Car(db.Model):
     engine = db.Column(db.String(100))
     consumption = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
-    # Отношение к бронированиям - УДАЛИТЕ старую строку и используйте эту
-    # bookings = db.relationship('Booking', backref='car_ref', lazy=True)  # УДАЛИТЕ ЭТО
-    bookings = db.relationship('Booking', backref='car', lazy=True, overlaps="booking_car,car_ref")
+    bookings = db.relationship('Booking', backref='car', lazy=True)
 
 
 class Booking(db.Model):
     __tablename__ = 'bookings'
-
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     car_id = db.Column(db.Integer, db.ForeignKey('cars.id'), nullable=False)
@@ -91,165 +76,94 @@ class Booking(db.Model):
 
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
-
-# Инициализация базы данных при запуске
 def init_db():
     with app.app_context():
         db.create_all()
-
-        # Создание администратора по умолчанию
-        admin = User.query.filter_by(username='Denis').first()
-        if not admin:
-            admin = User(
-                username='Denis',
-                email='Denis@carsharebsk.ru',
-                is_admin=True
-            )
+        if not User.query.filter_by(username='Denis').first():
+            admin = User(username='Denis', email='Denis@carsharebsk.ru', is_admin=True)
             admin.set_password('Denis123')
             db.session.add(admin)
             db.session.commit()
 
 
-# Загрузка тестовых автомобилей при первом запуске
 def load_test_data():
     with app.app_context():
         if Car.query.count() == 0:
             test_cars = [
-                Car(
-                    brand='Hyundai',
-                    model='Solaris',
-                    year=2023,
-                    daily_price=1200,
-                    fuel_type='Бензин',
-                    transmission='Автомат',
-                    seats=5,
+                Car(brand='Hyundai', model='Solaris', year=2023, daily_price=1200,
+                    fuel_type='Бензин', transmission='Автомат', seats=5,
                     location='ул. Ленина, 123',
                     image_url='https://s.auto.drom.ru/i24206/c/photos/fullsize/hyundai/solaris/hyundai_solaris_677323.jpg',
-                    is_available=True,
-                    color='Белый',
-                    description='Экономичный городской автомобиль',
-                    car_class='Эконом',
-                    features=['Кондиционер', 'Bluetooth', 'Парктроники'],
-                    engine='1.6L',
-                    consumption='6.5 л/100км'
-                ),
-                Car(
-                    brand='Toyota',
-                    model='Camry',
-                    year=2023,
-                    daily_price=2500,
-                    fuel_type='Бензин',
-                    transmission='Автомат',
-                    seats=5,
+                    is_available=True, color='Белый', description='Экономичный городской автомобиль',
+                    car_class='Эконом', features=['Кондиционер', 'Bluetooth', 'Парктроники'],
+                    engine='1.6L', consumption='6.5 л/100км'),
+                Car(brand='Toyota', model='Camry', year=2023, daily_price=2500,
+                    fuel_type='Бензин', transmission='Автомат', seats=5,
                     location='пр. Ленина, 89',
                     image_url='https://iat.ru/uploads/origin/models/737981/1.webp',
-                    is_available=True,
-                    color='Черный',
-                    description='Комфортабельный седан для бизнес-поездок',
-                    car_class='Комфорт',
-                    features=['Климат-контроль', 'Кожаный салон', 'Камера заднего вида'],
-                    engine='2.5L',
-                    consumption='7.8 л/100км'
-                ),
-                Car(
-                    brand='BMW',
-                    model='5 Series',
-                    year=2023,
-                    daily_price=4500,
-                    fuel_type='Бензин',
-                    transmission='Автомат',
-                    seats=5,
+                    is_available=True, color='Черный', description='Комфортабельный седан для бизнес-поездок',
+                    car_class='Комфорт', features=['Климат-контроль', 'Кожаный салон', 'Камера заднего вида'],
+                    engine='2.5L', consumption='7.8 л/100км'),
+                Car(brand='BMW', model='5 Series', year=2023, daily_price=4500,
+                    fuel_type='Бензин', transmission='Автомат', seats=5,
                     location='пр. Коммунарский, 156',
                     image_url='https://www.thedrive.com/wp-content/uploads/2024/10/tgI7q.jpg?w=1819&h=1023',
-                    is_available=True,
-                    color='Черный',
-                    description='Представительский седан бизнес-класса',
-                    car_class='Премиум',
-                    features=['Память сидений', 'Массаж сидений', 'Адаптивный круиз'],
-                    engine='3.0L',
-                    consumption='8.5 л/100км'
-                )
+                    is_available=True, color='Черный', description='Представительский седан бизнес-класса',
+                    car_class='Премиум', features=['Память сидений', 'Массаж сидений', 'Адаптивный круиз'],
+                    engine='3.0L', consumption='8.5 л/100км')
             ]
-
             for car in test_cars:
                 db.session.add(car)
             db.session.commit()
             print("✅ Тестовые автомобили загружены")
 
 
-# Загрузка пользователя для Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 
 # ========== АУТЕНТИФИКАЦИЯ ==========
-
-# Регистрация нового пользователя
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-
     if request.method == 'POST':
         data = request.form
         if data['password'] != data['confirm_password']:
             flash('Пароли не совпадают', 'danger')
             return redirect(url_for('register'))
-
         try:
-            # Проверка существования пользователя
-            existing_user = User.query.filter(
-                (User.username == data['username']) | (User.email == data['email'])
-            ).first()
-
-            if existing_user:
+            if User.query.filter((User.username == data['username']) | (User.email == data['email'])).first():
                 flash('Пользователь уже существует', 'danger')
                 return redirect(url_for('register'))
-
-            # Создание нового пользователя
-            new_user = User(
-                username=data['username'],
-                email=data['email'],
-                phone=data['phone'],
-                driver_license=data['driver_license']
-            )
+            new_user = User(username=data['username'], email=data['email'],
+                            phone=data['phone'], driver_license=data['driver_license'])
             new_user.set_password(data['password'])
-
             db.session.add(new_user)
             db.session.commit()
-
             flash('Регистрация успешна!', 'success')
             return redirect(url_for('login'))
         except Exception as e:
             flash(f'Ошибка: {str(e)}', 'danger')
-
     return render_template('register.html')
 
 
-# Вход в систему
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-
     if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-
-        user = User.query.filter_by(username=username).first()
-
-        if user and user.check_password(password):
+        user = User.query.filter_by(username=request.form['username']).first()
+        if user and user.check_password(request.form['password']):
             login_user(user)
-            flash(f'Добро пожаловать, {user.username}!', 'success')
+            role = "администратор" if user.is_admin else "пользователь"
+            flash(f'Добро пожаловать, {user.username}! (Вы вошли как {role})', 'success')
             return redirect(url_for('index'))
-        else:
-            flash('Неверные данные', 'danger')
-
+        flash('Неверные данные', 'danger')
     return render_template('login.html')
 
 
-# Выход из системы
 @app.route('/logout')
 @login_required
 def logout():
@@ -259,168 +173,94 @@ def logout():
 
 
 # ========== ОСНОВНЫЕ МАРШРУТЫ ==========
-
-# Главная страница с популярными автомобилями
 @app.route('/')
 def index():
-    # Три самых популярных автомобиля по количеству бронирований
-    popular_cars = db.session.query(
-        Car,
-        db.func.count(Booking.id).label('booking_count')
-    ).outerjoin(
-        Booking, Car.id == Booking.car_id
-    ).filter(
-        Car.is_available == True
-    ).group_by(
-        Car.id
-    ).order_by(
-        db.func.count(Booking.id).desc()
-    ).limit(3).all()
-
-    # Извлекаем только автомобили из результата
+    popular_cars = db.session.query(Car, db.func.count(Booking.id).label('booking_count')) \
+        .outerjoin(Booking, Car.id == Booking.car_id) \
+        .filter(Car.is_available == True) \
+        .group_by(Car.id).order_by(db.func.count(Booking.id).desc()).limit(3).all()
     cars = [car for car, _ in popular_cars]
-
-    total_cars = Car.query.count()
-    total_users = User.query.count()
-
-    return render_template('index.html', cars=cars, test_cars_count=total_cars, total_users=total_users)
+    return render_template('index.html', cars=cars,
+                           test_cars_count=Car.query.count(),
+                           total_users=User.query.count())
 
 
-# Страница всех автомобилей с фильтрами
 @app.route('/cars')
 def cars():
     car_class = request.args.get('class', 'all')
     transmission = request.args.get('transmission', 'all')
     fuel_type = request.args.get('fuel_type', 'all')
-
     query = Car.query.filter_by(is_available=True)
-
-    if car_class != 'all':
-        query = query.filter_by(car_class=car_class)
-    if transmission != 'all':
-        query = query.filter_by(transmission=transmission)
-    if fuel_type != 'all':
-        query = query.filter_by(fuel_type=fuel_type)
-
-    filtered_cars = query.all()
-
-    # Получение уникальных значений для фильтров
-    car_classes = [c[0] for c in db.session.query(Car.car_class).distinct().filter(Car.car_class.isnot(None)).all()]
-    transmissions = [t[0] for t in db.session.query(Car.transmission).distinct().all()]
-    fuel_types = [f[0] for f in db.session.query(Car.fuel_type).distinct().all()]
-
-    return render_template('cars.html',
-                           cars=filtered_cars,
-                           car_classes=car_classes,
-                           transmissions=transmissions,
-                           fuel_types=fuel_types,
-                           selected_class=car_class,
-                           selected_transmission=transmission,
-                           selected_fuel_type=fuel_type)
+    if car_class != 'all': query = query.filter_by(car_class=car_class)
+    if transmission != 'all': query = query.filter_by(transmission=transmission)
+    if fuel_type != 'all': query = query.filter_by(fuel_type=fuel_type)
+    return render_template('cars.html', cars=query.all(),
+                           car_classes=[c[0] for c in db.session.query(Car.car_class).distinct().filter(
+                               Car.car_class.isnot(None)).all()],
+                           transmissions=[t[0] for t in db.session.query(Car.transmission).distinct().all()],
+                           fuel_types=[f[0] for f in db.session.query(Car.fuel_type).distinct().all()],
+                           selected_class=car_class, selected_transmission=transmission, selected_fuel_type=fuel_type)
 
 
-# Страница деталей автомобиля для бронирования
 @app.route('/car/<int:car_id>')
 @login_required
 def car_detail(car_id):
-    car = Car.query.get(car_id)
+    car = db.session.get(Car, car_id)
     if not car:
         flash('Автомобиль не найден', 'danger')
         return redirect(url_for('cars'))
-
-    similar_cars = Car.query.filter(
-        Car.car_class == car.car_class,
-        Car.id != car_id
-    ).limit(3).all()
-
-    return render_template('booking.html', car=car, similar_cars=similar_cars)
+    return render_template('booking.html', car=car,
+                           similar_cars=Car.query.filter(Car.car_class == car.car_class, Car.id != car_id).limit(
+                               3).all())
 
 
-# ========== СОЗДАНИЕ БРОНИРОВАНИЯ АВТОМОБИЛЯ ==========
 @app.route('/book', methods=['POST'])
 @login_required
 def book_car():
     try:
-        car_id = int(request.form['car_id'])
+        car = db.session.get(Car, int(request.form['car_id']))
         start = datetime.strptime(request.form['start_date'], '%Y-%m-%d').date()
         end = datetime.strptime(request.form['end_date'], '%Y-%m-%d').date()
         today = datetime.now().date()
 
-        # Проверка корректности дат
-        if start < today:
-            return jsonify({'success': False, 'message': 'Дата начала не может быть в прошлом'})
-        if end < start:
-            return jsonify({'success': False, 'message': 'Дата окончания не может быть раньше даты начала'})
-        if start == end:
-            return jsonify({'success': False, 'message': 'Минимальный срок аренды - 1 день'})
+        if start < today: return jsonify({'success': False, 'message': 'Дата начала не может быть в прошлом'})
+        if end < start: return jsonify({'success': False, 'message': 'Дата окончания не может быть раньше даты начала'})
+        if start == end: return jsonify({'success': False, 'message': 'Минимальный срок аренды - 1 день'})
+        if not car or not car.is_available: return jsonify(
+            {'success': False, 'message': 'Автомобиль временно недоступен'})
 
-        # Проверка доступности автомобиля
-        car = Car.query.get(car_id)
-        if not car or not car.is_available:
-            return jsonify({'success': False, 'message': 'Автомобиль временно недоступен'})
-
-        # Проверка пересечений бронирований
-        existing_booking = Booking.query.filter(
-            Booking.car_id == car_id,
-            Booking.status == 'active',
-            Booking.start_date <= end,
-            Booking.end_date >= start
-        ).first()
-
-        if existing_booking:
+        if Booking.query.filter(Booking.car_id == car.id, Booking.status == 'active',
+                                Booking.start_date <= end, Booking.end_date >= start).first():
             return jsonify({'success': False, 'message': 'Автомобиль уже забронирован на эти даты'})
 
-        # Расчет стоимости и создание бронирования
         days = (end - start).days
         price = float(car.daily_price) * days
-
-        new_booking = Booking(
-            user_id=current_user.id,
-            car_id=car_id,
-            start_date=start,
-            end_date=end,
-            total_price=price
-        )
-
+        new_booking = Booking(user_id=current_user.id, car_id=car.id,
+                              start_date=start, end_date=end, total_price=price)
         db.session.add(new_booking)
         db.session.commit()
-
         return jsonify({'success': True, 'message': f'Бронирование создано! Стоимость: {price} ₽ за {days} дней.'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Ошибка при бронировании: {str(e)}'})
 
 
-# Личный кабинет пользователя с историей бронирований
 @app.route('/profile')
 @login_required
 def profile():
-    # Выполняем запрос и преобразуем в список словарей
     results = db.session.query(Booking, Car.brand, Car.model, Car.image_url) \
         .join(Car, Booking.car_id == Car.id) \
         .filter(Booking.user_id == current_user.id) \
-        .order_by(Booking.created_at.desc()) \
-        .all()
-
-    bookings = []
-    for booking, brand, model, image_url in results:
-        bookings.append({
-            'id': booking.id,
-            'user_id': booking.user_id,
-            'car_id': booking.car_id,
-            'start_date': booking.start_date,
-            'end_date': booking.end_date,
-            'total_price': float(booking.total_price) if booking.total_price else 0,
-            'status': booking.status,
-            'created_at': booking.created_at,
-            'brand': brand,
-            'model': model,
-            'image_url': image_url
-        })
-
+        .order_by(Booking.created_at.desc()).all()
+    bookings = [{
+        'id': b.id, 'user_id': b.user_id, 'car_id': b.car_id,
+        'start_date': b.start_date, 'end_date': b.end_date,
+        'total_price': float(b.total_price) if b.total_price else 0,
+        'status': b.status, 'created_at': b.created_at,
+        'brand': brand, 'model': model, 'image_url': image_url
+    } for b, brand, model, image_url in results]
     return render_template('profile.html', bookings=bookings)
 
 
-# Отмена бронирования пользователем
 @app.route('/cancel_booking/<int:booking_id>', methods=['POST'])
 @login_required
 def cancel_booking(booking_id):
@@ -432,21 +272,15 @@ def cancel_booking(booking_id):
     return redirect(url_for('profile'))
 
 
-# Страница контактов
 @app.route('/contacts')
-def contacts():
-    return render_template('contacts.html')
+def contacts(): return render_template('contacts.html')
 
 
-# Страница "О нас"
 @app.route('/about')
-def about():
-    return render_template('about.html')
+def about(): return render_template('about.html')
 
 
 # ========== АДМИНИСТРАТОР ==========
-
-# Декоратор для проверки прав администратора
 def admin_required(f):
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
@@ -458,72 +292,43 @@ def admin_required(f):
     return wrapper
 
 
-# Панель администратора со статистикой
 @app.route('/admin')
 @login_required
 @admin_required
 def admin():
-    total_cars = Car.query.count()
-    total_users = User.query.count()
-    active_bookings = Booking.query.filter_by(status='active').count()
-
-    # Сумма доходов
-    total_revenue_result = db.session.query(
-        db.func.coalesce(db.func.sum(Booking.total_price), 0)
-    ).filter_by(status='active').first()
-    total_revenue = float(total_revenue_result[0]) if total_revenue_result else 0
-
-    all_cars = Car.query.order_by(Car.id).all()
-
     return render_template('admin.html',
-                           total_cars=total_cars,
-                           total_users=total_users,
-                           active_bookings=active_bookings,
-                           total_revenue=total_revenue,
-                           all_cars=all_cars)
+                           total_cars=Car.query.count(),
+                           total_users=User.query.count(),
+                           active_bookings=Booking.query.filter_by(status='active').count(),
+                           total_revenue=float(db.session.query(db.func.coalesce(db.func.sum(Booking.total_price), 0))
+                                               .filter_by(status='active').first()[0] or 0),
+                           all_cars=Car.query.order_by(Car.id).all())
 
 
-# Получение данных автомобиля для редактирования
 @app.route('/admin/get_car/<int:car_id>')
 @login_required
 @admin_required
 def get_car_data(car_id):
-    car = Car.query.get(car_id)
-    if car:
-        car_data = {
-            'id': car.id,
-            'brand': car.brand,
-            'model': car.model,
-            'year': car.year,
-            'daily_price': float(car.daily_price),
-            'car_class': car.car_class,
-            'fuel_type': car.fuel_type,
-            'transmission': car.transmission,
-            'color': car.color,
-            'seats': car.seats,
-            'location': car.location,
-            'description': car.description,
-            'image_url': car.image_url,
-            'engine': car.engine,
-            'consumption': car.consumption,
-            'features': car.features
-        }
-        return jsonify({'success': True, 'car': car_data})
-    return jsonify({'success': False})
+    car = db.session.get(Car, car_id)
+    if not car: return jsonify({'success': False})
+    return jsonify({'success': True, 'car': {
+        'id': car.id, 'brand': car.brand, 'model': car.model, 'year': car.year,
+        'daily_price': float(car.daily_price), 'car_class': car.car_class,
+        'fuel_type': car.fuel_type, 'transmission': car.transmission,
+        'color': car.color, 'seats': car.seats, 'location': car.location,
+        'description': car.description, 'image_url': car.image_url,
+        'engine': car.engine, 'consumption': car.consumption,
+        'features': car.features
+    }})
 
 
-# Обновление данных автомобиля
 @app.route('/admin/update_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
 def update_car(car_id):
-    car = Car.query.get(car_id)
-    if not car:
-        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
-
+    car = db.session.get(Car, car_id)
+    if not car: return jsonify({'success': False, 'message': 'Автомобиль не найден'})
     data = request.form
-
-    # Обновление полей
     car.brand = data.get('brand', car.brand)
     car.model = data.get('model', car.model)
     car.year = int(data.get('year', car.year))
@@ -538,156 +343,94 @@ def update_car(car_id):
     car.image_url = data.get('image_url', car.image_url)
     car.engine = data.get('engine', car.engine)
     car.consumption = data.get('consumption', car.consumption)
-
-    # Обработка features
-    features_str = data.get('features', '')
-    if features_str:
+    if features_str := data.get('features', ''):
         car.features = [f.strip() for f in features_str.split(',') if f.strip()]
-
     db.session.commit()
     return jsonify({'success': True, 'message': 'Автомобиль обновлен'})
 
 
-# Удаление автомобиля
 @app.route('/admin/delete_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
 def delete_car(car_id):
-    car = Car.query.get(car_id)
-    if not car:
-        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
-
-    # Проверка активных бронирований
-    active_bookings = Booking.query.filter_by(car_id=car_id, status='active').count()
-    if active_bookings > 0:
+    car = db.session.get(Car, car_id)
+    if not car: return jsonify({'success': False, 'message': 'Автомобиль не найден'})
+    if Booking.query.filter_by(car_id=car_id, status='active').count() > 0:
         return jsonify({'success': False, 'message': 'Есть активные брони'})
-
-    # Удаление связанных бронирований
     Booking.query.filter_by(car_id=car_id).delete()
-
-    # Удаление автомобиля
     db.session.delete(car)
     db.session.commit()
-
     return jsonify({'success': True, 'message': f'Автомобиль {car.brand} {car.model} удален'})
 
 
-# Добавление нового автомобиля
 @app.route('/admin/add_car', methods=['POST'])
 @login_required
 @admin_required
 def add_car():
     data = request.form
-    if not data.get('image_url'):
-        return jsonify({'success': False, 'message': 'Нужна ссылка на фото'})
-
-    features_str = data.get('features', '')
-    features = [f.strip() for f in features_str.split(',') if f.strip()]
-
+    if not data.get('image_url'): return jsonify({'success': False, 'message': 'Нужна ссылка на фото'})
+    features = [f.strip() for f in data.get('features', '').split(',') if f.strip()]
     new_car = Car(
-        brand=data['brand'],
-        model=data['model'],
-        year=int(data['year']),
-        daily_price=float(data['daily_price']),
-        car_class=data['car_class'],
-        fuel_type=data['fuel_type'],
-        transmission=data['transmission'],
-        image_url=data['image_url'],
-        location=data.get('location', 'ул. Ленина, 123'),
-        color=data.get('color', 'синий'),
-        seats=int(data.get('seats', 5)),
+        brand=data['brand'], model=data['model'], year=int(data['year']),
+        daily_price=float(data['daily_price']), car_class=data['car_class'],
+        fuel_type=data['fuel_type'], transmission=data['transmission'],
+        image_url=data['image_url'], location=data.get('location', 'ул. Ленина, 123'),
+        color=data.get('color', 'синий'), seats=int(data.get('seats', 5)),
         description=data.get('description', f'Новый {data["brand"]} {data["model"]}'),
-        engine=data.get('engine', ''),
-        consumption=data.get('consumption', ''),
+        engine=data.get('engine', ''), consumption=data.get('consumption', ''),
         features=features if features else None
     )
-
     db.session.add(new_car)
     db.session.commit()
-
     return jsonify({'success': True, 'message': f'Автомобиль {data["brand"]} {data["model"]} добавлен'})
 
 
-# Переключение доступности автомобиля
 @app.route('/admin/toggle_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
 def toggle_car(car_id):
-    car = Car.query.get(car_id)
-    if not car:
-        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
-
+    car = db.session.get(Car, car_id)
+    if not car: return jsonify({'success': False, 'message': 'Автомобиль не найден'})
     car.is_available = not car.is_available
     db.session.commit()
+    return jsonify({'success': True,
+                    'message': f'Автомобиль {car.brand} {car.model} теперь {"доступен" if car.is_available else "недоступен"}'})
 
-    status = "доступен" if car.is_available else "недоступен"
-    return jsonify({'success': True, 'message': f'Автомобиль {car.brand} {car.model} теперь {status}'})
 
-
-# Управление пользователями
 @app.route('/admin/users')
 @login_required
 @admin_required
 def admin_users():
-    users = User.query.order_by(User.created_at.desc()).all()
+    stats = db.session.query(Booking.user_id,
+                             db.func.count(Booking.id).label('total'),
+                             db.func.sum(db.case((Booking.status == 'active', 1), else_=0)).label('active')) \
+        .group_by(Booking.user_id).all()
+    user_stats = {stat.user_id: {'total': stat.total, 'active': stat.active or 0} for stat in stats}
 
-    # Статистика бронирований по пользователям
-    stats = db.session.query(
-        Booking.user_id,
-        db.func.count(Booking.id).label('total'),
-        db.func.sum(db.case((Booking.status == 'active', 1), else_=0)).label('active')
-    ).group_by(Booking.user_id).all()
-
-    user_stats = {}
-    for stat in stats:
-        user_stats[stat.user_id] = {
-            'total': stat.total,
-            'active': stat.active or 0
-        }
-
-    # Все бронирования
     bookings_data = db.session.query(Booking, User.username, User.email, Car.brand, Car.model, Car.image_url) \
-        .join(User, Booking.user_id == User.id) \
-        .join(Car, Booking.car_id == Car.id) \
-        .order_by(Booking.created_at.desc()) \
-        .all()
+        .join(User, Booking.user_id == User.id).join(Car, Booking.car_id == Car.id) \
+        .order_by(Booking.created_at.desc()).all()
 
-    # Преобразуем в список словарей для шаблона
-    bookings = []
-    for booking, username, email, brand, model, image_url in bookings_data:
-        bookings.append({
-            'id': booking.id,
-            'user_id': booking.user_id,
-            'car_id': booking.car_id,
-            'start_date': booking.start_date,
-            'end_date': booking.end_date,
-            'total_price': float(booking.total_price) if booking.total_price else 0,
-            'status': booking.status,
-            'created_at': booking.created_at,
-            'username': username,
-            'email': email,
-            'brand': brand,
-            'model': model,
-            'image_url': image_url
-        })
-
-    admin_count = User.query.filter_by(is_admin=True).count()
-    user_count = User.query.filter_by(is_admin=False).count()
+    bookings = [{
+        'id': b.id, 'user_id': b.user_id, 'car_id': b.car_id,
+        'start_date': b.start_date, 'end_date': b.end_date,
+        'total_price': float(b.total_price) if b.total_price else 0,
+        'status': b.status, 'created_at': b.created_at,
+        'username': un, 'email': em, 'brand': br, 'model': mo, 'image_url': img
+    } for b, un, em, br, mo, img in bookings_data]
 
     return render_template('admin_users.html',
-                           users=users,
-                           user_stats=user_stats,
-                           bookings_db=bookings,
-                           admin_count=admin_count,
-                           user_count=user_count)
+                           users=User.query.order_by(User.created_at.desc()).all(),
+                           user_stats=user_stats, bookings_db=bookings,
+                           admin_count=User.query.filter_by(is_admin=True).count(),
+                           user_count=User.query.filter_by(is_admin=False).count())
 
 
-# Отмена бронирования администратором
 @app.route('/admin/cancel_booking/<int:booking_id>', methods=['POST'])
 @login_required
 @admin_required
 def admin_cancel_booking(booking_id):
-    booking = Booking.query.get(booking_id)
+    booking = db.session.get(Booking, booking_id)
     if booking:
         booking.status = 'cancelled'
         db.session.commit()
@@ -695,43 +438,32 @@ def admin_cancel_booking(booking_id):
     return jsonify({'success': False, 'message': 'Бронирование не найдено'})
 
 
-# Удаление пользователя администратором
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
 def admin_delete_user(user_id):
     if str(user_id) == current_user.id:
         return jsonify({'success': False, 'message': 'Нельзя удалить свой аккаунт'})
-
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'success': False, 'message': 'Пользователь не найден'})
-
-    # Удаление связанных бронирований
+    user = db.session.get(User, user_id)
+    if not user: return jsonify({'success': False, 'message': 'Пользователь не найден'})
     Booking.query.filter_by(user_id=user_id).delete()
-
-    # Удаление пользователя
     db.session.delete(user)
     db.session.commit()
-
     user_type = "администратора" if user.is_admin else "пользователя"
     return jsonify({'success': True, 'message': f'{user_type} {user.username} удален'})
 
-# ========== ОБРАБОТКА ОШИБОК И ЗАПУСК ==========
 
-# Обработка ошибки 404
+# ========== ЗАПУСК ==========
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
 
-# Запуск приложения
+
 if __name__ == '__main__':
     print("🚀 Сервис каршеринга запущен")
     print("🌐 http://localhost:5001")
     print("🔑 admin / admin123")
-
     with app.app_context():
         init_db()
         load_test_data()
-
     app.run(debug=True, port=5001)
