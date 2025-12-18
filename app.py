@@ -381,10 +381,28 @@ def book_car():
 @app.route('/profile')
 @login_required
 def profile():
-    bookings = Booking.query.filter_by(user_id=current_user.id) \
-        .join(Car) \
+    results = db.session.query(Booking, Car.brand, Car.model, Car.image_url) \
+        .join(Car, Booking.car_id == Car.id) \
+        .filter(Booking.user_id == current_user.id) \
         .order_by(Booking.created_at.desc()) \
         .all()
+
+    # Преобразуем в список словарей для шаблона
+    bookings = []
+    for booking, brand, model, image_url in results:
+        bookings.append({
+            'id': booking.id,
+            'user_id': booking.user_id,
+            'car_id': booking.car_id,
+            'start_date': booking.start_date,
+            'end_date': booking.end_date,
+            'total_price': float(booking.total_price) if booking.total_price else 0,
+            'status': booking.status,
+            'created_at': booking.created_at,
+            'brand': brand,
+            'model': model,
+            'image_url': image_url
+        })
 
     return render_template('profile.html', bookings=bookings)
 
