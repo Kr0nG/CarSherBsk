@@ -1,9 +1,10 @@
-
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from sqlalchemy import select
+from decimal import Decimal
 import os
 
 app = Flask(__name__)
@@ -38,8 +39,9 @@ class User(db.Model, UserMixin):
     driver_license = db.Column(db.String(50))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Отношения
-    bookings = db.relationship('Booking', backref='user', lazy=True)
+    # Отношение к бронированиям - УДАЛИТЕ старую строку и используйте эту
+    # bookings = db.relationship('Booking', backref='user_ref', lazy=True)  # УДАЛИТЕ ЭТО
+    bookings = db.relationship('Booking', backref='user', lazy=True, overlaps="booking_user,user_ref")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -70,8 +72,9 @@ class Car(db.Model):
     consumption = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Отношения
-    bookings = db.relationship('Booking', backref='car', lazy=True)
+    # Отношение к бронированиям - УДАЛИТЕ старую строку и используйте эту
+    # bookings = db.relationship('Booking', backref='car_ref', lazy=True)  # УДАЛИТЕ ЭТО
+    bookings = db.relationship('Booking', backref='car', lazy=True, overlaps="booking_car,car_ref")
 
 
 class Booking(db.Model):
@@ -177,7 +180,7 @@ def load_test_data():
 # Загрузка пользователя для Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db.session.get(User, int(user_id))
 
 
 # ========== АУТЕНТИФИКАЦИЯ ==========
@@ -261,16 +264,26 @@ def logout():
 @app.route('/')
 def index():
     # Три самых популярных автомобиля по количеству бронирований
-    popular_cars = Car.query.filter_by(is_available=True) \
-        .outerjoin(Booking) \
-        .group_by(Car.id) \
-        .order_by(db.func.count(Booking.id).desc()) \
-        .limit(3).all()
+    popular_cars = db.session.query(
+        Car,
+        db.func.count(Booking.id).label('booking_count')
+    ).outerjoin(
+        Booking, Car.id == Booking.car_id
+    ).filter(
+        Car.is_available == True
+    ).group_by(
+        Car.id
+    ).order_by(
+        db.func.count(Booking.id).desc()
+    ).limit(3).all()
+
+    # Извлекаем только автомобили из результата
+    cars = [car for car, _ in popular_cars]
 
     total_cars = Car.query.count()
     total_users = User.query.count()
 
-    return render_template('index.html', cars=popular_cars, test_cars_count=total_cars, total_users=total_users)
+    return render_template('index.html', cars=cars, test_cars_count=total_cars, total_users=total_users)
 
 
 # Страница всех автомобилей с фильтрами
@@ -292,15 +305,15 @@ def cars():
     filtered_cars = query.all()
 
     # Получение уникальных значений для фильтров
-    car_classes = db.session.query(Car.car_class).distinct().filter(Car.car_class.isnot(None)).all()
-    transmissions = db.session.query(Car.transmission).distinct().all()
-    fuel_types = db.session.query(Car.fuel_type).distinct().all()
+    car_classes = [c[0] for c in db.session.query(Car.car_class).distinct().filter(Car.car_class.isnot(None)).all()]
+    transmissions = [t[0] for t in db.session.query(Car.transmission).distinct().all()]
+    fuel_types = [f[0] for f in db.session.query(Car.fuel_type).distinct().all()]
 
     return render_template('cars.html',
                            cars=filtered_cars,
-                           car_classes=[c[0] for c in car_classes],
-                           transmissions=[t[0] for t in transmissions],
-                           fuel_types=[f[0] for f in fuel_types],
+                           car_classes=car_classes,
+                           transmissions=transmissions,
+                           fuel_types=fuel_types,
                            selected_class=car_class,
                            selected_transmission=transmission,
                            selected_fuel_type=fuel_type)
@@ -310,7 +323,7 @@ def cars():
 @app.route('/car/<int:car_id>')
 @login_required
 def car_detail(car_id):
-    car = Car.query.get_or_404(car_id)
+    car = Car.query.get(car_id)
     if not car:
         flash('Автомобиль не найден', 'danger')
         return redirect(url_for('cars'))
@@ -381,13 +394,13 @@ def book_car():
 @app.route('/profile')
 @login_required
 def profile():
+    # Выполняем запрос и преобразуем в список словарей
     results = db.session.query(Booking, Car.brand, Car.model, Car.image_url) \
         .join(Car, Booking.car_id == Car.id) \
         .filter(Booking.user_id == current_user.id) \
         .order_by(Booking.created_at.desc()) \
         .all()
 
-    # Преобразуем в список словарей для шаблона
     bookings = []
     for booking, brand, model, image_url in results:
         bookings.append({
@@ -453,9 +466,12 @@ def admin():
     total_cars = Car.query.count()
     total_users = User.query.count()
     active_bookings = Booking.query.filter_by(status='active').count()
-    total_revenue = db.session.query(
+
+    # Сумма доходов
+    total_revenue_result = db.session.query(
         db.func.coalesce(db.func.sum(Booking.total_price), 0)
-    ).filter_by(status='active').scalar()
+    ).filter_by(status='active').first()
+    total_revenue = float(total_revenue_result[0]) if total_revenue_result else 0
 
     all_cars = Car.query.order_by(Car.id).all()
 
@@ -614,23 +630,46 @@ def toggle_car(car_id):
 @admin_required
 def admin_users():
     users = User.query.order_by(User.created_at.desc()).all()
-    bookings = Booking.query.join(User).join(Car) \
-        .order_by(Booking.created_at.desc()) \
-        .all()
 
     # Статистика бронирований по пользователям
-    user_stats = {}
     stats = db.session.query(
         Booking.user_id,
         db.func.count(Booking.id).label('total'),
         db.func.sum(db.case((Booking.status == 'active', 1), else_=0)).label('active')
     ).group_by(Booking.user_id).all()
 
+    user_stats = {}
     for stat in stats:
         user_stats[stat.user_id] = {
             'total': stat.total,
-            'active': stat.active
+            'active': stat.active or 0
         }
+
+    # Все бронирования
+    bookings_data = db.session.query(Booking, User.username, User.email, Car.brand, Car.model, Car.image_url) \
+        .join(User, Booking.user_id == User.id) \
+        .join(Car, Booking.car_id == Car.id) \
+        .order_by(Booking.created_at.desc()) \
+        .all()
+
+    # Преобразуем в список словарей для шаблона
+    bookings = []
+    for booking, username, email, brand, model, image_url in bookings_data:
+        bookings.append({
+            'id': booking.id,
+            'user_id': booking.user_id,
+            'car_id': booking.car_id,
+            'start_date': booking.start_date,
+            'end_date': booking.end_date,
+            'total_price': float(booking.total_price) if booking.total_price else 0,
+            'status': booking.status,
+            'created_at': booking.created_at,
+            'username': username,
+            'email': email,
+            'brand': brand,
+            'model': model,
+            'image_url': image_url
+        })
 
     admin_count = User.query.filter_by(is_admin=True).count()
     user_count = User.query.filter_by(is_admin=False).count()
@@ -678,14 +717,12 @@ def admin_delete_user(user_id):
     user_type = "администратора" if user.is_admin else "пользователя"
     return jsonify({'success': True, 'message': f'{user_type} {user.username} удален'})
 
-
 # ========== ОБРАБОТКА ОШИБОК И ЗАПУСК ==========
 
 # Обработка ошибки 404
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
-
 
 # Запуск приложения
 if __name__ == '__main__':
