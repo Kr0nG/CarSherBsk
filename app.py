@@ -1,148 +1,183 @@
+
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-import psycopg2
-from psycopg2.extras import RealDictCursor
 import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'secret')
 
+# Настройка базы данных через SQLAlchemy
+app.config[
+    'SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgre:CT0s2HSM3WpzFqmnRdWRRjDJriS3PlW4@dpg-d4vqh2vpm1nc73btsd1g-a.oregon-postgres.render.com:5432/carsharing_gg29'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 300,
+    'pool_pre_ping': True,
+}
+
+db = SQLAlchemy(app)
+
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
-DB_CONFIG = {
-    'dbname': 'carsharing_gg29',
-    'user': 'postgre',
-    'password': 'CT0s2HSM3WpzFqmnRdWRRjDJriS3PlW4',
-    'host': 'dpg-d4vqh2vpm1nc73btsd1g-a.oregon-postgres.render.com',
-    'port': '5432'
-}
+
+# ========== МОДЕЛИ БАЗЫ ДАННЫХ ==========
+
+class User(db.Model, UserMixin):
+    __tablename__ = 'users'
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    is_admin = db.Column(db.Boolean, default=False)
+    phone = db.Column(db.String(20))
+    driver_license = db.Column(db.String(50))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Отношения
+    bookings = db.relationship('Booking', backref='user', lazy=True)
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+
+class Car(db.Model):
+    __tablename__ = 'cars'
+
+    id = db.Column(db.Integer, primary_key=True)
+    brand = db.Column(db.String(100), nullable=False)
+    model = db.Column(db.String(100), nullable=False)
+    year = db.Column(db.Integer, nullable=False)
+    daily_price = db.Column(db.Numeric(10, 2), nullable=False)
+    fuel_type = db.Column(db.String(50))
+    transmission = db.Column(db.String(50))
+    seats = db.Column(db.Integer, default=5)
+    location = db.Column(db.String(255))
+    image_url = db.Column(db.Text)
+    is_available = db.Column(db.Boolean, default=True)
+    color = db.Column(db.String(50))
+    description = db.Column(db.Text)
+    car_class = db.Column(db.String(50), default='Эконом')
+    features = db.Column(db.ARRAY(db.String))
+    engine = db.Column(db.String(100))
+    consumption = db.Column(db.String(100))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Отношения
+    bookings = db.relationship('Booking', backref='car', lazy=True)
+
+
+class Booking(db.Model):
+    __tablename__ = 'bookings'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    car_id = db.Column(db.Integer, db.ForeignKey('cars.id'), nullable=False)
+    start_date = db.Column(db.Date, nullable=False)
+    end_date = db.Column(db.Date, nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    status = db.Column(db.String(50), default='active')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 
-# Подключение к базе данных
-def get_db():
-    return psycopg2.connect(**DB_CONFIG)
-
-
-# Класс пользователя для Flask-Login
-class User(UserMixin):
-    def __init__(self, id, username, email, password_hash, is_admin=False, phone=None, license=None):
-        self.id = id
-        self.username = username
-        self.email = email
-        self.password_hash = password_hash
-        self.is_admin = is_admin
-        self.phone = phone
-        self.driver_license = license
-
-
 # Инициализация базы данных при запуске
 def init_db():
-    with get_db() as conn, conn.cursor() as cur:
-        # Создание таблицы пользователей
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50) UNIQUE NOT NULL,
-                email VARCHAR(100) UNIQUE NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                is_admin BOOLEAN DEFAULT FALSE,
-                phone VARCHAR(20),
-                driver_license VARCHAR(50),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Создание таблицы автомобилей
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS cars (
-                id SERIAL PRIMARY KEY,
-                brand VARCHAR(100) NOT NULL,
-                model VARCHAR(100) NOT NULL,
-                year INTEGER NOT NULL,
-                daily_price DECIMAL(10,2) NOT NULL,
-                fuel_type VARCHAR(50),
-                transmission VARCHAR(50),
-                seats INTEGER DEFAULT 5,
-                location VARCHAR(255),
-                image_url TEXT,
-                is_available BOOLEAN DEFAULT TRUE,
-                color VARCHAR(50),
-                description TEXT,
-                car_class VARCHAR(50) DEFAULT 'Эконом',
-                features TEXT[],
-                engine VARCHAR(100),
-                consumption VARCHAR(100),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Создание таблицы бронирований
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS bookings (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                car_id INTEGER REFERENCES cars(id),
-                start_date DATE NOT NULL,
-                end_date DATE NOT NULL,
-                total_price DECIMAL(10,2) NOT NULL,
-                status VARCHAR(50) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
+    with app.app_context():
+        db.create_all()
 
         # Создание администратора по умолчанию
-        cur.execute("SELECT id FROM users WHERE username = 'Denis'")
-        if not cur.fetchone():
-            cur.execute('INSERT INTO users (username, email, password_hash, is_admin) VALUES (%s, %s, %s, %s)',
-                        ('Denis', 'Denis@carsharebsk.ru', generate_password_hash('Denis123'), True))
-        conn.commit()
+        admin = User.query.filter_by(username='Denis').first()
+        if not admin:
+            admin = User(
+                username='Denis',
+                email='Denis@carsharebsk.ru',
+                is_admin=True
+            )
+            admin.set_password('Denis123')
+            db.session.add(admin)
+            db.session.commit()
 
 
 # Загрузка тестовых автомобилей при первом запуске
 def load_test_data():
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT COUNT(*) as count FROM cars')
-        if cur.fetchone()['count'] == 0:
-            cars = [
-                ('Hyundai', 'Solaris', 2023, 1200, 'Бензин', 'Автомат', 5, 'ул. Ленина, 123',
-                 'https://s.auto.drom.ru/i24206/c/photos/fullsize/hyundai/solaris/hyundai_solaris_677323.jpg',
-                 True, 'Белый', 'Экономичный городской автомобиль', 'Эконом',
-                 ['Кондиционер', 'Bluetooth', 'Парктроники'], '1.6L', '6.5 л/100км'),
-                ('Toyota', 'Camry', 2023, 2500, 'Бензин', 'Автомат', 5, 'пр. Ленина, 89',
-                 'https://iat.ru/uploads/origin/models/737981/1.webp', True, 'Черный',
-                 'Комфортабельный седан для бизнес-поездок', 'Комфорт',
-                 ['Климат-контроль', 'Кожаный салон', 'Камера заднего вида'], '2.5L', '7.8 л/100км'),
-                ('BMW', '5 Series', 2023, 4500, 'Бензин', 'Автомат', 5, 'пр. Коммунарский, 156',
-                 'https://www.thedrive.com/wp-content/uploads/2024/10/tgI7q.jpg?w=1819&h=1023',
-                 True, 'Черный', 'Представительский седан бизнес-класса', 'Премиум',
-                 ['Память сидений', 'Массаж сидений', 'Адаптивный круиз'], '3.0L', '8.5 л/100км')
+    with app.app_context():
+        if Car.query.count() == 0:
+            test_cars = [
+                Car(
+                    brand='Hyundai',
+                    model='Solaris',
+                    year=2023,
+                    daily_price=1200,
+                    fuel_type='Бензин',
+                    transmission='Автомат',
+                    seats=5,
+                    location='ул. Ленина, 123',
+                    image_url='https://s.auto.drom.ru/i24206/c/photos/fullsize/hyundai/solaris/hyundai_solaris_677323.jpg',
+                    is_available=True,
+                    color='Белый',
+                    description='Экономичный городской автомобиль',
+                    car_class='Эконом',
+                    features=['Кондиционер', 'Bluetooth', 'Парктроники'],
+                    engine='1.6L',
+                    consumption='6.5 л/100км'
+                ),
+                Car(
+                    brand='Toyota',
+                    model='Camry',
+                    year=2023,
+                    daily_price=2500,
+                    fuel_type='Бензин',
+                    transmission='Автомат',
+                    seats=5,
+                    location='пр. Ленина, 89',
+                    image_url='https://iat.ru/uploads/origin/models/737981/1.webp',
+                    is_available=True,
+                    color='Черный',
+                    description='Комфортабельный седан для бизнес-поездок',
+                    car_class='Комфорт',
+                    features=['Климат-контроль', 'Кожаный салон', 'Камера заднего вида'],
+                    engine='2.5L',
+                    consumption='7.8 л/100км'
+                ),
+                Car(
+                    brand='BMW',
+                    model='5 Series',
+                    year=2023,
+                    daily_price=4500,
+                    fuel_type='Бензин',
+                    transmission='Автомат',
+                    seats=5,
+                    location='пр. Коммунарский, 156',
+                    image_url='https://www.thedrive.com/wp-content/uploads/2024/10/tgI7q.jpg?w=1819&h=1023',
+                    is_available=True,
+                    color='Черный',
+                    description='Представительский седан бизнес-класса',
+                    car_class='Премиум',
+                    features=['Память сидений', 'Массаж сидений', 'Адаптивный круиз'],
+                    engine='3.0L',
+                    consumption='8.5 л/100км'
+                )
             ]
-            for car in cars:
-                cur.execute('''
-                    INSERT INTO cars (brand, model, year, daily_price, fuel_type, transmission,
-                                    seats, location, image_url, is_available, color, description,
-                                    car_class, features, engine, consumption)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ''', car)
-            conn.commit()
+
+            for car in test_cars:
+                db.session.add(car)
+            db.session.commit()
             print("✅ Тестовые автомобили загружены")
 
 
 # Загрузка пользователя для Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT * FROM users WHERE id = %s', (user_id,))
-        data = cur.fetchone()
-        if data:
-            return User(str(data['id']), data['username'], data['email'],
-                        data['password_hash'], data['is_admin'], data['phone'], data['driver_license'])
-    return None
+    return User.query.get(int(user_id))
 
 
 # ========== АУТЕНТИФИКАЦИЯ ==========
@@ -160,19 +195,29 @@ def register():
             return redirect(url_for('register'))
 
         try:
-            with get_db() as conn, conn.cursor() as cur:
-                cur.execute('SELECT id FROM users WHERE username = %s OR email = %s', (data['username'], data['email']))
-                if cur.fetchone():
-                    flash('Пользователь уже существует', 'danger')
-                    return redirect(url_for('register'))
+            # Проверка существования пользователя
+            existing_user = User.query.filter(
+                (User.username == data['username']) | (User.email == data['email'])
+            ).first()
 
-                cur.execute(
-                    'INSERT INTO users (username, email, password_hash, phone, driver_license) VALUES (%s, %s, %s, %s, %s)',
-                    (data['username'], data['email'], generate_password_hash(data['password']), data['phone'],
-                     data['driver_license']))
-                conn.commit()
-                flash('Регистрация успешна!', 'success')
-                return redirect(url_for('login'))
+            if existing_user:
+                flash('Пользователь уже существует', 'danger')
+                return redirect(url_for('register'))
+
+            # Создание нового пользователя
+            new_user = User(
+                username=data['username'],
+                email=data['email'],
+                phone=data['phone'],
+                driver_license=data['driver_license']
+            )
+            new_user.set_password(data['password'])
+
+            db.session.add(new_user)
+            db.session.commit()
+
+            flash('Регистрация успешна!', 'success')
+            return redirect(url_for('login'))
         except Exception as e:
             flash(f'Ошибка: {str(e)}', 'danger')
 
@@ -189,18 +234,14 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute('SELECT * FROM users WHERE username = %s', (username,))
-            data = cur.fetchone()
+        user = User.query.filter_by(username=username).first()
 
-            if data and check_password_hash(data['password_hash'], password):
-                user = User(str(data['id']), data['username'], data['email'],
-                            data['password_hash'], data['is_admin'], data['phone'], data['driver_license'])
-                login_user(user)
-                flash(f'Добро пожаловать, {user.username}!', 'success')
-                return redirect(url_for('index'))
-            else:
-                flash('Неверные данные', 'danger')
+        if user and user.check_password(password):
+            login_user(user)
+            flash(f'Добро пожаловать, {user.username}!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Неверные данные', 'danger')
 
     return render_template('login.html')
 
@@ -219,23 +260,17 @@ def logout():
 # Главная страница с популярными автомобилями
 @app.route('/')
 def index():
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        # Три самых популярных автомобиля по количеству бронирований
-        cur.execute('''
-            SELECT c.*, COUNT(b.id) as booking_count
-            FROM cars c LEFT JOIN bookings b ON c.id = b.car_id
-            WHERE c.is_available = TRUE
-            GROUP BY c.id ORDER BY booking_count DESC LIMIT 3
-        ''')
-        popular_cars = cur.fetchall()
+    # Три самых популярных автомобиля по количеству бронирований
+    popular_cars = Car.query.filter_by(is_available=True) \
+        .outerjoin(Booking) \
+        .group_by(Car.id) \
+        .order_by(db.func.count(Booking.id).desc()) \
+        .limit(3).all()
 
-        cur.execute('SELECT COUNT(*) as count FROM cars')
-        total_cars = cur.fetchone()['count']
+    total_cars = Car.query.count()
+    total_users = User.query.count()
 
-        cur.execute('SELECT COUNT(*) as count FROM users')
-        total_users = cur.fetchone()['count']
-
-        return render_template('index.html', cars=popular_cars, test_cars_count=total_cars, total_users=total_users)
+    return render_template('index.html', cars=popular_cars, test_cars_count=total_cars, total_users=total_users)
 
 
 # Страница всех автомобилей с фильтрами
@@ -245,50 +280,47 @@ def cars():
     transmission = request.args.get('transmission', 'all')
     fuel_type = request.args.get('fuel_type', 'all')
 
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        query = 'SELECT * FROM cars WHERE is_available = TRUE'
-        params = []
+    query = Car.query.filter_by(is_available=True)
 
-        if car_class != 'all':
-            query += ' AND car_class = %s'
-            params.append(car_class)
-        if transmission != 'all':
-            query += ' AND transmission = %s'
-            params.append(transmission)
-        if fuel_type != 'all':
-            query += ' AND fuel_type = %s'
-            params.append(fuel_type)
+    if car_class != 'all':
+        query = query.filter_by(car_class=car_class)
+    if transmission != 'all':
+        query = query.filter_by(transmission=transmission)
+    if fuel_type != 'all':
+        query = query.filter_by(fuel_type=fuel_type)
 
-        cur.execute(query, params)
-        filtered_cars = cur.fetchall()
+    filtered_cars = query.all()
 
-        cur.execute("SELECT DISTINCT car_class FROM cars WHERE car_class IS NOT NULL")
-        car_classes = [r['car_class'] for r in cur.fetchall()]
-        cur.execute("SELECT DISTINCT transmission FROM cars")
-        transmissions = [r['transmission'] for r in cur.fetchall()]
-        cur.execute("SELECT DISTINCT fuel_type FROM cars")
-        fuel_types = [r['fuel_type'] for r in cur.fetchall()]
+    # Получение уникальных значений для фильтров
+    car_classes = db.session.query(Car.car_class).distinct().filter(Car.car_class.isnot(None)).all()
+    transmissions = db.session.query(Car.transmission).distinct().all()
+    fuel_types = db.session.query(Car.fuel_type).distinct().all()
 
-        return render_template('cars.html', cars=filtered_cars, car_classes=car_classes,
-                               transmissions=transmissions, fuel_types=fuel_types,
-                               selected_class=car_class, selected_transmission=transmission,
-                               selected_fuel_type=fuel_type)
+    return render_template('cars.html',
+                           cars=filtered_cars,
+                           car_classes=[c[0] for c in car_classes],
+                           transmissions=[t[0] for t in transmissions],
+                           fuel_types=[f[0] for f in fuel_types],
+                           selected_class=car_class,
+                           selected_transmission=transmission,
+                           selected_fuel_type=fuel_type)
 
 
 # Страница деталей автомобиля для бронирования
 @app.route('/car/<int:car_id>')
 @login_required
 def car_detail(car_id):
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT * FROM cars WHERE id = %s', (car_id,))
-        car = cur.fetchone()
-        if not car:
-            flash('Автомобиль не найден', 'danger')
-            return redirect(url_for('cars'))
+    car = Car.query.get_or_404(car_id)
+    if not car:
+        flash('Автомобиль не найден', 'danger')
+        return redirect(url_for('cars'))
 
-        cur.execute('SELECT * FROM cars WHERE car_class = %s AND id != %s LIMIT 3', (car['car_class'], car_id))
-        similar = cur.fetchall()
-        return render_template('booking.html', car=car, similar_cars=similar)
+    similar_cars = Car.query.filter(
+        Car.car_class == car.car_class,
+        Car.id != car_id
+    ).limit(3).all()
+
+    return render_template('booking.html', car=car, similar_cars=similar_cars)
 
 
 # ========== СОЗДАНИЕ БРОНИРОВАНИЯ АВТОМОБИЛЯ ==========
@@ -309,57 +341,62 @@ def book_car():
         if start == end:
             return jsonify({'success': False, 'message': 'Минимальный срок аренды - 1 день'})
 
-        with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Проверка доступности автомобиля
-            cur.execute('SELECT * FROM cars WHERE id = %s', (car_id,))
-            car = cur.fetchone()
-            if not car or not car['is_available']:
-                return jsonify({'success': False, 'message': 'Автомобиль временно недоступен'})
+        # Проверка доступности автомобиля
+        car = Car.query.get(car_id)
+        if not car or not car.is_available:
+            return jsonify({'success': False, 'message': 'Автомобиль временно недоступен'})
 
-            # Проверка пересечений бронирований
-            cur.execute('''
-                SELECT id FROM bookings 
-                WHERE car_id = %s AND status = 'active' 
-                AND (start_date <= %s AND end_date >= %s)
-            ''', (car_id, end, start))
+        # Проверка пересечений бронирований
+        existing_booking = Booking.query.filter(
+            Booking.car_id == car_id,
+            Booking.status == 'active',
+            Booking.start_date <= end,
+            Booking.end_date >= start
+        ).first()
 
-            if cur.fetchone():
-                return jsonify({'success': False, 'message': 'Автомобиль уже забронирован на эти даты'})
+        if existing_booking:
+            return jsonify({'success': False, 'message': 'Автомобиль уже забронирован на эти даты'})
 
-            # Расчет стоимости и создание бронирования
-            days = (end - start).days
-            price = float(car['daily_price']) * days
+        # Расчет стоимости и создание бронирования
+        days = (end - start).days
+        price = float(car.daily_price) * days
 
-            cur.execute('''
-                INSERT INTO bookings (user_id, car_id, start_date, end_date, total_price)
-                VALUES (%s, %s, %s, %s, %s)
-            ''', (current_user.id, car_id, start, end, price))
-            conn.commit()
+        new_booking = Booking(
+            user_id=current_user.id,
+            car_id=car_id,
+            start_date=start,
+            end_date=end,
+            total_price=price
+        )
 
-            return jsonify({'success': True, 'message': f'Бронирование создано! Стоимость: {price} ₽ за {days} дней.'})
-    except:
-        return jsonify({'success': False, 'message': 'Ошибка при бронировании'})
+        db.session.add(new_booking)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': f'Бронирование создано! Стоимость: {price} ₽ за {days} дней.'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Ошибка при бронировании: {str(e)}'})
 
 
 # Личный кабинет пользователя с историей бронирований
 @app.route('/profile')
 @login_required
 def profile():
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(
-            'SELECT b.*, c.brand, c.model, c.image_url FROM bookings b JOIN cars c ON b.car_id = c.id WHERE b.user_id = %s ORDER BY b.created_at DESC',
-            (current_user.id,))
-        return render_template('profile.html', bookings=cur.fetchall())
+    bookings = Booking.query.filter_by(user_id=current_user.id) \
+        .join(Car) \
+        .order_by(Booking.created_at.desc()) \
+        .all()
+
+    return render_template('profile.html', bookings=bookings)
 
 
 # Отмена бронирования пользователем
 @app.route('/cancel_booking/<int:booking_id>', methods=['POST'])
 @login_required
 def cancel_booking(booking_id):
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute("UPDATE bookings SET status = 'cancelled' WHERE id = %s AND user_id = %s",
-                    (booking_id, current_user.id))
-        conn.commit()
+    booking = Booking.query.filter_by(id=booking_id, user_id=current_user.id).first()
+    if booking:
+        booking.status = 'cancelled'
+        db.session.commit()
         flash('Бронь отменена', 'success')
     return redirect(url_for('profile'))
 
@@ -395,20 +432,21 @@ def admin_required(f):
 @login_required
 @admin_required
 def admin():
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT COUNT(*) as count FROM cars')
-        total_cars = cur.fetchone()['count']
-        cur.execute('SELECT COUNT(*) as count FROM users')
-        total_users = cur.fetchone()['count']
-        cur.execute("SELECT COUNT(*) as count FROM bookings WHERE status = 'active'")
-        active = cur.fetchone()['count']
-        cur.execute("SELECT COALESCE(SUM(total_price), 0) as total FROM bookings WHERE status = 'active'")
-        revenue = cur.fetchone()['total']
-        cur.execute('SELECT * FROM cars ORDER BY id')
-        cars = cur.fetchall()
+    total_cars = Car.query.count()
+    total_users = User.query.count()
+    active_bookings = Booking.query.filter_by(status='active').count()
+    total_revenue = db.session.query(
+        db.func.coalesce(db.func.sum(Booking.total_price), 0)
+    ).filter_by(status='active').scalar()
 
-        return render_template('admin.html', total_cars=total_cars, total_users=total_users,
-                               active_bookings=active, total_revenue=revenue, all_cars=cars)
+    all_cars = Car.query.order_by(Car.id).all()
+
+    return render_template('admin.html',
+                           total_cars=total_cars,
+                           total_users=total_users,
+                           active_bookings=active_bookings,
+                           total_revenue=total_revenue,
+                           all_cars=all_cars)
 
 
 # Получение данных автомобиля для редактирования
@@ -416,10 +454,28 @@ def admin():
 @login_required
 @admin_required
 def get_car_data(car_id):
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT * FROM cars WHERE id = %s', (car_id,))
-        car = cur.fetchone()
-        return jsonify({'success': bool(car), 'car': car})
+    car = Car.query.get(car_id)
+    if car:
+        car_data = {
+            'id': car.id,
+            'brand': car.brand,
+            'model': car.model,
+            'year': car.year,
+            'daily_price': float(car.daily_price),
+            'car_class': car.car_class,
+            'fuel_type': car.fuel_type,
+            'transmission': car.transmission,
+            'color': car.color,
+            'seats': car.seats,
+            'location': car.location,
+            'description': car.description,
+            'image_url': car.image_url,
+            'engine': car.engine,
+            'consumption': car.consumption,
+            'features': car.features
+        }
+        return jsonify({'success': True, 'car': car_data})
+    return jsonify({'success': False})
 
 
 # Обновление данных автомобиля
@@ -427,44 +483,35 @@ def get_car_data(car_id):
 @login_required
 @admin_required
 def update_car(car_id):
-    with get_db() as conn, conn.cursor() as cur:
-        data = request.form
+    car = Car.query.get(car_id)
+    if not car:
+        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
 
-        features_str = data.get('features', '')
-        features = [f.strip() for f in features_str.split(',') if f.strip()]
+    data = request.form
 
-        update_query = '''
-            UPDATE cars SET 
-                brand = COALESCE(%s, brand),
-                model = COALESCE(%s, model),
-                year = COALESCE(%s, year),
-                daily_price = COALESCE(%s, daily_price),
-                car_class = COALESCE(%s, car_class),
-                fuel_type = COALESCE(%s, fuel_type),
-                transmission = COALESCE(%s, transmission),
-                color = COALESCE(%s, color),
-                seats = COALESCE(%s, seats),
-                location = COALESCE(%s, location),
-                description = COALESCE(%s, description),
-                image_url = COALESCE(%s, image_url),
-                engine = COALESCE(%s, engine),
-                consumption = COALESCE(%s, consumption),
-                features = COALESCE(%s, features)
-            WHERE id = %s
-        '''
+    # Обновление полей
+    car.brand = data.get('brand', car.brand)
+    car.model = data.get('model', car.model)
+    car.year = int(data.get('year', car.year))
+    car.daily_price = float(data.get('daily_price', car.daily_price))
+    car.car_class = data.get('car_class', car.car_class)
+    car.fuel_type = data.get('fuel_type', car.fuel_type)
+    car.transmission = data.get('transmission', car.transmission)
+    car.color = data.get('color', car.color)
+    car.seats = int(data.get('seats', car.seats))
+    car.location = data.get('location', car.location)
+    car.description = data.get('description', car.description)
+    car.image_url = data.get('image_url', car.image_url)
+    car.engine = data.get('engine', car.engine)
+    car.consumption = data.get('consumption', car.consumption)
 
-        cur.execute(update_query, (
-            data.get('brand'), data.get('model'), data.get('year'),
-            data.get('daily_price'), data.get('car_class'),
-            data.get('fuel_type'), data.get('transmission'),
-            data.get('color'), data.get('seats'), data.get('location'),
-            data.get('description'), data.get('image_url'),
-            data.get('engine'), data.get('consumption'),
-            features if features else None, car_id
-        ))
+    # Обработка features
+    features_str = data.get('features', '')
+    if features_str:
+        car.features = [f.strip() for f in features_str.split(',') if f.strip()]
 
-        conn.commit()
-        return jsonify({'success': True, 'message': 'Автомобиль обновлен'})
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Автомобиль обновлен'})
 
 
 # Удаление автомобиля
@@ -472,20 +519,23 @@ def update_car(car_id):
 @login_required
 @admin_required
 def delete_car(car_id):
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute('SELECT brand, model FROM cars WHERE id = %s', (car_id,))
-        car = cur.fetchone()
-        if not car:
-            return jsonify({'success': False, 'message': 'Автомобиль не найден'})
+    car = Car.query.get(car_id)
+    if not car:
+        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
 
-        cur.execute("SELECT COUNT(*) FROM bookings WHERE car_id = %s AND status = 'active'", (car_id,))
-        if cur.fetchone()[0] > 0:
-            return jsonify({'success': False, 'message': 'Есть активные брони'})
+    # Проверка активных бронирований
+    active_bookings = Booking.query.filter_by(car_id=car_id, status='active').count()
+    if active_bookings > 0:
+        return jsonify({'success': False, 'message': 'Есть активные брони'})
 
-        cur.execute('DELETE FROM bookings WHERE car_id = %s', (car_id,))
-        cur.execute('DELETE FROM cars WHERE id = %s', (car_id,))
-        conn.commit()
-        return jsonify({'success': True, 'message': f'Автомобиль {car[0]} {car[1]} удален'})
+    # Удаление связанных бронирований
+    Booking.query.filter_by(car_id=car_id).delete()
+
+    # Удаление автомобиля
+    db.session.delete(car)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': f'Автомобиль {car.brand} {car.model} удален'})
 
 
 # Добавление нового автомобиля
@@ -500,21 +550,28 @@ def add_car():
     features_str = data.get('features', '')
     features = [f.strip() for f in features_str.split(',') if f.strip()]
 
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute('''
-            INSERT INTO cars (brand, model, year, daily_price, car_class, fuel_type, 
-                            transmission, image_url, location, color, seats, description,
-                            engine, consumption, features)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ''', (
-            data['brand'], data['model'], int(data['year']), float(data['daily_price']),
-            data['car_class'], data['fuel_type'], data['transmission'], data['image_url'],
-            data.get('location', 'ул. Ленина, 123'), data.get('color', 'синий'),
-            int(data.get('seats', 5)), data.get('description', f'Новый {data["brand"]} {data["model"]}'),
-            data.get('engine', ''), data.get('consumption', ''), features if features else None
-        ))
-        conn.commit()
-        return jsonify({'success': True, 'message': f'Автомобиль {data["brand"]} {data["model"]} добавлен'})
+    new_car = Car(
+        brand=data['brand'],
+        model=data['model'],
+        year=int(data['year']),
+        daily_price=float(data['daily_price']),
+        car_class=data['car_class'],
+        fuel_type=data['fuel_type'],
+        transmission=data['transmission'],
+        image_url=data['image_url'],
+        location=data.get('location', 'ул. Ленина, 123'),
+        color=data.get('color', 'синий'),
+        seats=int(data.get('seats', 5)),
+        description=data.get('description', f'Новый {data["brand"]} {data["model"]}'),
+        engine=data.get('engine', ''),
+        consumption=data.get('consumption', ''),
+        features=features if features else None
+    )
+
+    db.session.add(new_car)
+    db.session.commit()
+
+    return jsonify({'success': True, 'message': f'Автомобиль {data["brand"]} {data["model"]} добавлен'})
 
 
 # Переключение доступности автомобиля
@@ -522,66 +579,50 @@ def add_car():
 @login_required
 @admin_required
 def toggle_car(car_id):
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute('SELECT brand, model, is_available FROM cars WHERE id = %s', (car_id,))
-        car = cur.fetchone()
-        if not car:
-            return jsonify({'success': False, 'message': 'Автомобиль не найден'})
+    car = Car.query.get(car_id)
+    if not car:
+        return jsonify({'success': False, 'message': 'Автомобиль не найден'})
 
-        new_status = not car[2]
-        cur.execute('UPDATE cars SET is_available = %s WHERE id = %s', (new_status, car_id))
-        conn.commit()
+    car.is_available = not car.is_available
+    db.session.commit()
 
-        status = "доступен" if new_status else "недоступен"
-        return jsonify({'success': True, 'message': f'Автомобиль {car[0]} {car[1]} теперь {status}'})
+    status = "доступен" if car.is_available else "недоступен"
+    return jsonify({'success': True, 'message': f'Автомобиль {car.brand} {car.model} теперь {status}'})
 
 
-# Управление пользователями (ИСПРАВЛЕННЫЙ ВАРИАНТ)
+# Управление пользователями
 @app.route('/admin/users')
 @login_required
 @admin_required
 def admin_users():
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT * FROM users ORDER BY created_at DESC')
-        users = cur.fetchall()
+    users = User.query.order_by(User.created_at.desc()).all()
+    bookings = Booking.query.join(User).join(Car) \
+        .order_by(Booking.created_at.desc()) \
+        .all()
 
-        # Статистика бронирований по пользователям - ИСПРАВЛЕННЫЙ ЗАПРОС
-        user_stats = {}
-        cur.execute('''
-            SELECT user_id, 
-                   COUNT(*) as total,
-                   SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active
-            FROM bookings 
-            GROUP BY user_id
-        ''')
+    # Статистика бронирований по пользователям
+    user_stats = {}
+    stats = db.session.query(
+        Booking.user_id,
+        db.func.count(Booking.id).label('total'),
+        db.func.sum(db.case((Booking.status == 'active', 1), else_=0)).label('active')
+    ).group_by(Booking.user_id).all()
 
-        for r in cur.fetchall():
-            user_stats[r['user_id']] = {
-                'total': r['total'],
-                'active': r['active']
-            }
+    for stat in stats:
+        user_stats[stat.user_id] = {
+            'total': stat.total,
+            'active': stat.active
+        }
 
-        # Все бронирования
-        cur.execute('''
-            SELECT b.*, u.username, u.email, c.brand, c.model, c.image_url 
-            FROM bookings b JOIN users u ON b.user_id = u.id JOIN cars c ON b.car_id = c.id
-            ORDER BY b.created_at DESC
-        ''')
-        bookings = cur.fetchall()
+    admin_count = User.query.filter_by(is_admin=True).count()
+    user_count = User.query.filter_by(is_admin=False).count()
 
-        # ДОБАВЬТЕ ЭТОТ КОД - Подсчет администраторов и пользователей
-        cur.execute("SELECT COUNT(*) as count FROM users WHERE is_admin = TRUE")
-        admin_count = cur.fetchone()['count']
-
-        cur.execute("SELECT COUNT(*) as count FROM users WHERE is_admin = FALSE")
-        user_count = cur.fetchone()['count']
-
-        return render_template('admin_users.html',
-                               users=users,
-                               user_stats=user_stats,
-                               bookings_db=bookings,
-                               admin_count=admin_count,  # ДОБАВЬТЕ ЭТО
-                               user_count=user_count)
+    return render_template('admin_users.html',
+                           users=users,
+                           user_stats=user_stats,
+                           bookings_db=bookings,
+                           admin_count=admin_count,
+                           user_count=user_count)
 
 
 # Отмена бронирования администратором
@@ -589,33 +630,35 @@ def admin_users():
 @login_required
 @admin_required
 def admin_cancel_booking(booking_id):
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute("UPDATE bookings SET status = 'cancelled' WHERE id = %s", (booking_id,))
-        conn.commit()
+    booking = Booking.query.get(booking_id)
+    if booking:
+        booking.status = 'cancelled'
+        db.session.commit()
         return jsonify({'success': True, 'message': 'Бронирование отменено'})
+    return jsonify({'success': False, 'message': 'Бронирование не найдено'})
 
 
 # Удаление пользователя администратором
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 @login_required
-
 @admin_required
 def admin_delete_user(user_id):
     if str(user_id) == current_user.id:
         return jsonify({'success': False, 'message': 'Нельзя удалить свой аккаунт'})
 
-    with get_db() as conn, conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute('SELECT username, is_admin FROM users WHERE id = %s', (user_id,))
-        user = cur.fetchone()
-        if not user:
-            return jsonify({'success': False, 'message': 'Пользователь не найден'})
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'success': False, 'message': 'Пользователь не найден'})
 
-        cur.execute('DELETE FROM bookings WHERE user_id = %s', (user_id,))
-        cur.execute('DELETE FROM users WHERE id = %s', (user_id,))
-        conn.commit()
+    # Удаление связанных бронирований
+    Booking.query.filter_by(user_id=user_id).delete()
 
-        user_type = "администратора" if user['is_admin'] else "пользователя"
-        return jsonify({'success': True, 'message': f'{user_type} {user["username"]} удален'})
+    # Удаление пользователя
+    db.session.delete(user)
+    db.session.commit()
+
+    user_type = "администратора" if user.is_admin else "пользователя"
+    return jsonify({'success': True, 'message': f'{user_type} {user.username} удален'})
 
 
 # ========== ОБРАБОТКА ОШИБОК И ЗАПУСК ==========
@@ -632,6 +675,8 @@ if __name__ == '__main__':
     print("🌐 http://localhost:5001")
     print("🔑 admin / admin123")
 
-    init_db()
-    load_test_data()
+    with app.app_context():
+        init_db()
+        load_test_data()
+
     app.run(debug=True, port=5001)
