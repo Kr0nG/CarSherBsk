@@ -76,6 +76,8 @@ class Booking(db.Model):
 
 
 # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+# Инициализация базы данных при первом запуске
 def init_db():
     with app.app_context():
         db.create_all()
@@ -86,6 +88,7 @@ def init_db():
             db.session.commit()
 
 
+# Загрузка тестовых автомобилей при первом запуске
 def load_test_data():
     with app.app_context():
         if Car.query.count() == 0:
@@ -118,12 +121,15 @@ def load_test_data():
             print("✅ Тестовые автомобили загружены")
 
 
+# Загрузка пользователя для Flask-Login
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
 
 # ========== АУТЕНТИФИКАЦИЯ ==========
+
+# Регистрация нового пользователя
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
@@ -149,6 +155,7 @@ def register():
     return render_template('register.html')
 
 
+# Вход в систему
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -164,6 +171,7 @@ def login():
     return render_template('login.html')
 
 
+# Выход из системы
 @app.route('/logout')
 @login_required
 def logout():
@@ -173,6 +181,8 @@ def logout():
 
 
 # ========== ОСНОВНЫЕ МАРШРУТЫ ==========
+
+# Главная страница с популярными автомобилями
 @app.route('/')
 def index():
     popular_cars = db.session.query(Car, db.func.count(Booking.id).label('booking_count')) \
@@ -185,6 +195,7 @@ def index():
                            total_users=User.query.count())
 
 
+# Страница всех автомобилей с фильтрами
 @app.route('/cars')
 def cars():
     car_class = request.args.get('class', 'all')
@@ -202,6 +213,7 @@ def cars():
                            selected_class=car_class, selected_transmission=transmission, selected_fuel_type=fuel_type)
 
 
+# Страница деталей автомобиля для бронирования
 @app.route('/car/<int:car_id>')
 @login_required
 def car_detail(car_id):
@@ -214,6 +226,7 @@ def car_detail(car_id):
                                3).all())
 
 
+# Создание бронирования автомобиля
 @app.route('/book', methods=['POST'])
 @login_required
 def book_car():
@@ -244,6 +257,7 @@ def book_car():
         return jsonify({'success': False, 'message': f'Ошибка при бронировании: {str(e)}'})
 
 
+# Личный кабинет пользователя с историей бронирований
 @app.route('/profile')
 @login_required
 def profile():
@@ -261,6 +275,7 @@ def profile():
     return render_template('profile.html', bookings=bookings)
 
 
+# Отмена бронирования пользователем
 @app.route('/cancel_booking/<int:booking_id>', methods=['POST'])
 @login_required
 def cancel_booking(booking_id):
@@ -272,15 +287,21 @@ def cancel_booking(booking_id):
     return redirect(url_for('profile'))
 
 
+# Страница контактов
 @app.route('/contacts')
-def contacts(): return render_template('contacts.html')
+def contacts():
+    return render_template('contacts.html')
 
 
+# Страница "О нас"
 @app.route('/about')
-def about(): return render_template('about.html')
+def about():
+    return render_template('about.html')
 
 
 # ========== АДМИНИСТРАТОР ==========
+
+# Декоратор для проверки прав администратора
 def admin_required(f):
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.is_admin:
@@ -292,6 +313,7 @@ def admin_required(f):
     return wrapper
 
 
+# Панель администратора со статистикой
 @app.route('/admin')
 @login_required
 @admin_required
@@ -305,6 +327,7 @@ def admin():
                            all_cars=Car.query.order_by(Car.id).all())
 
 
+# Получение данных автомобиля для редактирования
 @app.route('/admin/get_car/<int:car_id>')
 @login_required
 @admin_required
@@ -322,6 +345,7 @@ def get_car_data(car_id):
     }})
 
 
+# Обновление данных автомобиля
 @app.route('/admin/update_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -349,6 +373,7 @@ def update_car(car_id):
     return jsonify({'success': True, 'message': 'Автомобиль обновлен'})
 
 
+# Удаление автомобиля
 @app.route('/admin/delete_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -363,6 +388,7 @@ def delete_car(car_id):
     return jsonify({'success': True, 'message': f'Автомобиль {car.brand} {car.model} удален'})
 
 
+# Добавление нового автомобиля
 @app.route('/admin/add_car', methods=['POST'])
 @login_required
 @admin_required
@@ -385,6 +411,7 @@ def add_car():
     return jsonify({'success': True, 'message': f'Автомобиль {data["brand"]} {data["model"]} добавлен'})
 
 
+# Переключение доступности автомобиля
 @app.route('/admin/toggle_car/<int:car_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -396,7 +423,7 @@ def toggle_car(car_id):
     return jsonify({'success': True,
                     'message': f'Автомобиль {car.brand} {car.model} теперь {"доступен" if car.is_available else "недоступен"}'})
 
-
+# Управление пользователями
 @app.route('/admin/users')
 @login_required
 @admin_required
@@ -426,6 +453,7 @@ def admin_users():
                            user_count=User.query.filter_by(is_admin=False).count())
 
 
+# Отмена бронирования администратором
 @app.route('/admin/cancel_booking/<int:booking_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -438,6 +466,7 @@ def admin_cancel_booking(booking_id):
     return jsonify({'success': False, 'message': 'Бронирование не найдено'})
 
 
+# Удаление пользователя администратором
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 @login_required
 @admin_required
@@ -454,6 +483,8 @@ def admin_delete_user(user_id):
 
 
 # ========== ЗАПУСК ==========
+
+# Обработка ошибки 404
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('404.html'), 404
@@ -462,7 +493,7 @@ def not_found_error(error):
 if __name__ == '__main__':
     print("🚀 Сервис каршеринга запущен")
     print("🌐 http://localhost:5001")
-    print("🔑 admin / admin123")
+    print("🔑 Denis / Denis123")
     with app.app_context():
         init_db()
         load_test_data()
