@@ -10,7 +10,7 @@
         </div>
         <div class="text-end">
             <div class="text-muted">Найдено автомобилей: <strong class="text-primary">{{ cars|length }}</strong></div>
-            <small class="text-muted">Из {{ test_cars_count }} всего</small>
+            <small class="text-muted">Из {{ total_cars }} всего</small>
         </div>
     </div>
 
@@ -241,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (window.location.search) {
         setTimeout(() => {
-            const resultsElement = document.querySelector('.row');
+            const resultsElement = document.querySelector('.row:has(.car-card)');
             if (resultsElement) {
                 resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }

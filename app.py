@@ -210,7 +210,7 @@ def cars():
                                Car.car_class.isnot(None)).all()],
                            transmissions=[t[0] for t in db.session.query(Car.transmission).distinct().all()],
                            fuel_types=[f[0] for f in db.session.query(Car.fuel_type).distinct().all()],
-                           selected_class=car_class, selected_transmission=transmission, selected_fuel_type=fuel_type)
+                           selected_class=car_class, selected_transmission=transmission, selected_fuel_type=fuel_type,total_cars=Car.query.count())
 
 
 # Страница деталей автомобиля для бронирования
