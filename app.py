@@ -478,7 +478,7 @@ def admin_delete_user(user_id):
     Booking.query.filter_by(user_id=user_id).delete()
     db.session.delete(user)
     db.session.commit()
-    user_type = "администратора" if user.is_admin else "пользователя"
+    user_type = "Администратора" if user.is_admin else "Пользователь"
     return jsonify({'success': True, 'message': f'{user_type} {user.username} удален'})
 
 
